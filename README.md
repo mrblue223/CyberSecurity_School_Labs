@@ -3,7 +3,7 @@
 **Target Domain:** `gwallofchina.yulcyberhub.click`
 
 ## 📖 Overview
-This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. The project follows a **DevSecOps** methodology, ensuring that DNS security (DNSSEC, SPF, DMARC, DKIM) and server instances are deployed using "Infrastructure as Code" (IaC) principles to eliminate manual configuration errors.
+This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. This repo aims to automate most of the manual task for optimizing SSL Certificates for a webserver (Apache / Nginx) and mail server (Postfix).
 
 ---
 
