@@ -3,6 +3,8 @@
 ![AWS](https://img.shields.io/badge/Platform-AWS-FF9900?style=flat-square&labelColor=555555&logo=amazon-aws&logoColor=white)
 ![Bash](https://img.shields.io/badge/Script-Bash-4EAA25?style=flat-square&labelColor=555555&logo=gnu-bash&logoColor=white)
 ![Python](https://img.shields.io/badge/Audit-Python-3776AB?style=flat-square&labelColor=555555&logo=python&logoColor=white)
+![Workflow: Direct-Push](https://img.shields.io/badge/Workflow-Direct--Push-blue?style=flat-square&labelColor=555555)
+![Trust: Team--Verified](https://img.shields.io/badge/Trust-Team--Verified-success?style=flat-square&labelColor=555555)
 
 # 🛡️ Optimizing SSL Certificates for webserver (Apache / Nginx and mail server (Postfix)
 **Course:** Cyber Defense - Assignment 1  
