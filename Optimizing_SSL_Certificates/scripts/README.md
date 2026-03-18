@@ -17,7 +17,7 @@ This repository contains a suite of automation scripts designed to provision, ha
 
 ## 🚀 Automation Scripts
 
-### 1. DNS Hardening Script (`hardened-dns-setup.sh`)
+### 1. DNS record Script (`dns-record-setup.sh`)
 Automates the deployment of 16+ DNS records to Route 53.
 * **Features:** Implements strict `p=reject` DMARC policies, SPF hard fails, and automated MTA-STS ID generation.
 * **Usage:**
