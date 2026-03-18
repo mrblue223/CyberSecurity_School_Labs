@@ -1,5 +1,13 @@
 #!/bin/bash
 
+################################################################################
+# Script Name:  dns-record-setup.sh
+# Description:  Automated DNS records for gwallofchina.yulcyberhub.click
+# Author:       Mrblue
+# Date:         2026-03-18
+# Requirements: AWS CLI, Authorized SSO Session
+################################################################################
+
 # Usage: ./hardened-dns-setup.sh <HOSTED_ZONE_ID>
 if [ -z "$1" ]; then
     echo "❌ Error: Please provide your Hosted Zone ID."
