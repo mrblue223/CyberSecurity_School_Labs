@@ -1,6 +1,5 @@
 ![Status](https://img.shields.io/badge/Status-In--Progress-yellow?style=flat-square&labelColor=555555)
 ![Course](https://img.shields.io/badge/Course-Cyber_Defense-red?style=flat-square&labelColor=555555)
-
 ![AWS](https://img.shields.io/badge/Platform-AWS-FF9900?style=flat-square&labelColor=555555&logo=amazon-aws&logoColor=white)
 ![Bash](https://img.shields.io/badge/Script-Bash-4EAA25?style=flat-square&labelColor=555555&logo=gnu-bash&logoColor=white)
 ![Python](https://img.shields.io/badge/Audit-Python-3776AB?style=flat-square&labelColor=555555&logo=python&logoColor=white)
