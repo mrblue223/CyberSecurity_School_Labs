@@ -3,7 +3,7 @@
 **Target Domain:** `gwallofchina.yulcyberhub.click`
 
 ## 📖 Overview
-This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. This repo aims to automate most of the manual task for optimizing SSL Certificates for a webserver (Apache / Nginx) and mail server (Postfix).
+This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. These instances will be running Apcache or Nginx, and a mail server (Postfix).
 
 ---
 
