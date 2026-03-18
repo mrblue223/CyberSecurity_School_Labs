@@ -1,5 +1,5 @@
 ![Course: Cyber_Defense](https://img.shields.io/badge/Course-Cyber_Defense-red?style=for-the-badge)
-![Status: Hardened](https://img.shields.io/badge/Status-Hardened-success?style=for-the-badge)
+![Status: In-Progress](https://img.shields.io/badge/Status-In--Progress-yellow?style=for-the-badge)
 
 ![AWS](https://img.shields.io/badge/AWS-%23FF9900.svg?style=for-the-badge&logo=amazon-aws&logoColor=white)
 ![Bash](https://img.shields.io/badge/bash-%234EAA25.svg?style=for-the-badge&logo=gnu-bash&logoColor=white)
