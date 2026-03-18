@@ -1,9 +1,9 @@
-# 🛡️ Project GWall-of-China: Hardened Infrastructure Automation
+# 🛡️ Optimizing SSL Certificates for webserver (Apache / Nginx and mail server (Postfix)
 **Course:** Cyber Defense - Assignment 1  
 **Target Domain:** `gwallofchina.yulcyberhub.click`
 
 ## 📖 Overview
-This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. These instances will be running Apcache or Nginx, and a mail server (Postfix).
+This repository contains a suite of automation scripts designed to provision, harden, and manage a secure web and mail infrastructure on AWS. These instances will be running Apcache or Nginx, and a mail server (Postfix). And hopefully when the lab is finished the full assignment with step by step instructions on how to recreate the environment.
 
 ---
 
