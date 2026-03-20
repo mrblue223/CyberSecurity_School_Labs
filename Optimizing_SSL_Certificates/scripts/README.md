@@ -17,7 +17,7 @@ This repository contains a suite of automation scripts designed to provision, ha
 
 ## 🛠️ Technical Stack
 * **Cloud Provider:** AWS (Route 53, EC2)
-* **Operating System:** Debian / Kali Linux
+* **Operating System:** Rocky Linux 10
 * **Automation:** Bash (AWS CLI v2)
 * **Security Layer:** DNSSEC, IMDSv2, SPF, DKIM, DMARC, MTA-STS
 
