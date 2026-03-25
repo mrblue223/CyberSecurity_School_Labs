@@ -1,10 +1,10 @@
-# AWS CLI Setup Guide
-> SSO Authentication + EC2 Instance Deployment  
+# 🛡️ AWS CLI Setup Guide
+> 🔐 SSO Authentication + EC2 Instance Deployment  
 > **MEQ7 — Room 3 — Vanier College Cyber Defense 2026**
 
 ---
 
-## Table of Contents
+## 📚 Table of Contents
 - [Part 1 — AWS SSO Configuration](#part-1--aws-sso-configuration)
   - [Prerequisites](#prerequisites)
   - [Step 1 — Clean Existing AWS Config](#step-1--clean-existing-aws-config)
@@ -22,11 +22,11 @@
 
 ---
 
-## Part 1 — AWS SSO Configuration
+## 🔑 Part 1 — AWS SSO Configuration
 
 This section documents how to configure the AWS CLI to authenticate using IAM Identity Center (SSO). This only needs to be done once — credentials are cached and renewed automatically.
 
-### Prerequisites
+### ✅ Prerequisites
 
 - AWS CLI v2 installed on your machine
 - Access to the AWS SSO portal: `https://d-90660512c9.awsapps.com/start`
@@ -34,7 +34,7 @@ This section documents how to configure the AWS CLI to authenticate using IAM Id
 
 ---
 
-### Step 1 — Clean Existing AWS Config
+### 🧹 Step 1 — Clean Existing AWS Config
 
 Remove any previous credentials that may conflict.
 
@@ -50,7 +50,7 @@ ls ~/.aws/
 
 ---
 
-### Step 2 — Run the SSO Configuration Wizard
+### 🧙 Step 2 — Run the SSO Configuration Wizard
 
 ```bash
 aws configure sso
@@ -70,7 +70,7 @@ Fill in the wizard with the following values:
 
 ---
 
-### Step 3 — Approve Browser Authentication
+### 🌐 Step 3 — Approve Browser Authentication
 
 The CLI will automatically open your default browser with an AWS authorization page.
 
@@ -84,7 +84,7 @@ The CLI will then automatically select:
 
 ---
 
-### Step 4 — Verify the Connection
+### 🔍 Step 4 — Verify the Connection
 
 ```bash
 aws sts get-caller-identity --profile meq7
@@ -104,7 +104,7 @@ Expected output:
 
 ---
 
-### Daily Usage
+### 📅 Daily Usage
 
 SSO credentials expire periodically. To renew them:
 
@@ -122,17 +122,17 @@ aws ec2 describe-instances --profile meq7
 
 ---
 
-## Part 2 — EC2 Instance Launch Script
+## 🚀 Part 2 — EC2 Instance Launch Script
 
 This section documents the `launch-instance.sh` script created to deploy an EC2 instance from the terminal using the AWS CLI, without touching the AWS Console.
 
-### Instance Configuration
+### ⚙️ Instance Configuration
 
 | Parameter | Value |
 |-----------|-------|
 | AMI | `ami-0c421724a94bba6d6` (Amazon Linux 2023) |
 | Instance Type | `t3.small` (2 vCPU, 2GB RAM) |
-| Key Pair | `MrPauloTest` (ED25519, .pem format) |
+| Key Pair | `thegreatfirewallofchina` (ED25519, .pem format) |
 | Security Group | `sg-0c7a7efce68ce2773` (Meq7 - Room3 - The Real Deal) |
 | VPC | `vpc-02a24edaa08acb420` (Default) |
 | Public IP | Auto-assigned (enabled) |
@@ -140,7 +140,7 @@ This section documents the `launch-instance.sh` script created to deploy an EC2 
 | Storage | 15 GB gp3 (3000 IOPS, 125 MB/s) |
 | SSH User | `ec2-user` |
 
-### Tags Applied
+### 🏷️ Tags Applied
 
 | Tag Key | Tag Value |
 |---------|-----------|
@@ -150,7 +150,7 @@ This section documents the `launch-instance.sh` script created to deploy an EC2 
 
 ---
 
-### The Script — launch-instance.sh
+### 📜 The Script — launch-instance.sh
 
 The script uses variables defined at the top — to reuse for a different lab, only the `CONFIG` block needs to be updated. All values below are applied automatically.
 
@@ -163,7 +163,7 @@ The script uses variables defined at the top — to reuse for a different lab, o
 # ── CONFIG ─────────────────────────────────────────────
 AMI="ami-0c421724a94bba6d6"
 INSTANCE_TYPE="t3.small"
-KEY_NAME="MrPauloTest"
+KEY_NAME="thegreatfirewallofchina"
 SECURITY_GROUP="sg-0c7a7efce68ce2773"
 VM_NAME="CLI_Test"
 COHORT="MEQ7"
@@ -190,33 +190,33 @@ aws ec2 run-instances \
 
 ---
 
-### How to Use
+### 🛠️ How to Use
 
-**Step 1 — Save the script**
+**Step 1 — 💾 Save the script**
 ```bash
 nano launch-instance.sh
 # Paste the script, save with Ctrl+O → Enter → Ctrl+X
 ```
 
-**Step 2 — Make it executable** *(only needed once)*
+**Step 2 — 🔓 Make it executable** *(only needed once)*
 ```bash
 chmod +x launch-instance.sh
 ```
 
-**Step 3 — Login to AWS SSO**
+**Step 3 — 🔑 Login to AWS SSO**
 ```bash
 aws sso login --profile meq7
 ```
 
-**Step 4 — Run the script**
+**Step 4 — ▶️ Run the script**
 ```bash
 ./launch-instance.sh
 ```
 
-**Step 5 — Connect via SSH**
+**Step 5 — 🖥️ Connect via SSH**
 ```bash
 # Fix key permissions (required by SSH)
-chmod 400 MrPauloTest.pem
+chmod 400 thegreatfirewallofchina.pem
 
 # Get the public IP
 aws ec2 describe-instances \
@@ -226,12 +226,12 @@ aws ec2 describe-instances \
   --profile meq7
 
 # Connect (Amazon Linux 2023 default user = ec2-user)
-ssh -i MrPauloTest.pem ec2-user@YOUR_PUBLIC_IP
+ssh -i thegreatfirewallofchina.pem ec2-user@YOUR_PUBLIC_IP
 ```
 
 ---
 
-### Reusing for a Different Lab
+### 🔄 Reusing for a Different Lab
 
 To deploy a new instance for a different lab, only update the `CONFIG` block at the top:
 
@@ -252,18 +252,18 @@ PROFILE="meq7"               # Keep same profile
 
 ---
 
-## Quick Reference
+## ⚡ Quick Reference
 
 | Task | Command |
 |------|---------|
-| Login to AWS SSO | `aws sso login --profile meq7` |
-| Verify identity | `aws sts get-caller-identity --profile meq7` |
-| Logout | `aws sso logout` |
-| Launch EC2 | `./launch-instance.sh` |
-| List instances | `aws ec2 describe-instances --profile meq7` |
-| SSH to instance | `ssh -i MrPauloTest.pem ec2-user@IP` |
-| Fix key permissions | `chmod 400 MrPauloTest.pem` |
-| Make script executable | `chmod +x launch-instance.sh` |
+| 🔑 Login to AWS SSO | `aws sso login --profile meq7` |
+| 🔍 Verify identity | `aws sts get-caller-identity --profile meq7` |
+| 🚪 Logout | `aws sso logout` |
+| 🚀 Launch EC2 | `./launch-instance.sh` |
+| 📋 List instances | `aws ec2 describe-instances --profile meq7` |
+| 🖥️ SSH to instance | `ssh -i thegreatfirewallofchina.pem ec2-user@IP` |
+| 🔒 Fix key permissions | `chmod 400 thegreatfirewallofchina.pem` |
+| ⚙️ Make script executable | `chmod +x launch-instance.sh` |
 
 ---
 
