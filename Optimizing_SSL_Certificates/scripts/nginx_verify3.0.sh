@@ -3,6 +3,7 @@
 #  nginx-verify.sh — Nginx Hardening Verification Script
 #  Verifies both Docker and Bare-Metal nginx hardening
 #  Version: 1.0.0
+# By: mrblue
 # =============================================================================
 
 set -euo pipefail
