@@ -130,7 +130,7 @@ This section documents the `launch-instance.sh` script created to deploy an EC2 
 
 | Parameter | Value |
 |-----------|-------|
-| AMI | `ami-0c421724a94bba6d6` (Amazon Linux 2023) |
+| AMI | `ami-059807ea93f3306ee` (Rocky-10-EC2-Base-10.1-20251116.0.aarch64-prod-3xyej43miofh4) |
 | Instance Type | `t3.small` (2 vCPU, 2GB RAM) |
 | Key Pair | `thegreatfirewallofchina` (ED25519, .pem format) |
 | Security Group | `sg-0c7a7efce68ce2773` (Meq7 - Room3 - The Real Deal) |
@@ -161,7 +161,7 @@ The script uses variables defined at the top — to reuse for a different lab, o
 # By doing this, it will automatically update the entire script below
 
 # ── CONFIG ─────────────────────────────────────────────
-AMI="ami-0c421724a94bba6d6"
+AMI="ami-059807ea93f3306ee"
 INSTANCE_TYPE="t3.small"
 KEY_NAME="thegreatfirewallofchina"
 SECURITY_GROUP="sg-0c7a7efce68ce2773"
@@ -225,7 +225,7 @@ aws ec2 describe-instances \
   --output text \
   --profile meq7
 
-# Connect (Amazon Linux 2023 default user = ec2-user)
+# Connect (Rocky-10-EC2-Base-10.1-20251116.0.aarch64 default rocky = ec2-user)
 ssh -i thegreatfirewallofchina.pem ec2-user@YOUR_PUBLIC_IP
 ```
 
