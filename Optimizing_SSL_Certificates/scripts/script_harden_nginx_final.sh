@@ -3,6 +3,7 @@
 #  nginx-harden.sh — Enterprise-Grade Nginx Hardening Script
 #  Tested on: Rocky Linux 8/9/10, RHEL 8/9, AlmaLinux 8/9
 #  Version: 4.0.0
+# By: mrblue
 # =============================================================================
 # MODES:
 #   [1] Bare-Metal / VM     — Installs & hardens system Nginx
