@@ -1,6 +1,6 @@
 # 🛡️ AWS CLI Setup Guide
 > 🔐 SSO Authentication + EC2 Instance Deployment  
-> **MEQ7 — Room 3 — Vanier College Cyber Defense 2026**
+> **Author: Paulo Borelli** | **MEQ7 — Room 3 — Vanier College Cyber Defense 2026**
 
 ---
 
