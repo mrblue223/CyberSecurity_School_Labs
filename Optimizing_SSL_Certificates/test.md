@@ -802,7 +802,7 @@ sudo ./lynis audit system --quick
 
 The cache directory was prepared before running the audit:
 
-![Lynis mkdir/chown/chmod nginx cache directory](screenshots/lynis_audit_results.png)
+![Lynis mkdir/chown/chmod nginx cache directory](images/image48.png)
 
 ### SSL Labs Final Scores
 
