@@ -67,7 +67,7 @@ aws-vault add my-secure-profile
 aws-vault exec my-secure-profile -- aws s3 ls
 ```
 
-![aws-vault configuration](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image17.png)
+![aws-vault configuration](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image17.png)
 
 #### The "Pro" Way: `aws configure sso`
 
@@ -78,11 +78,11 @@ aws configure sso
 # SSO Start URL, region, and scopes configured via the access portal
 ```
 
-![AWS SSO configuration terminal](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image18.png)
+![AWS SSO configuration terminal](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image18.png)
 
-![AWS access portal SSO login](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image15.png)
+![AWS access portal SSO login](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image15.png)
 
-![SSO ghost credentials cache](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image11.png)
+![SSO ghost credentials cache](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image11.png)
 
 > **Note:** Profile aliases were added to `.bashrc` for quality-of-life improvements without compromising security boundaries.
 
@@ -101,9 +101,9 @@ A hosted zone is the container that tells the internet how to route traffic for 
 
 The critical step is **delegation**: after creation, AWS generated 4 Name Servers (NS records) that must be registered in the parent zone — handled by the lab oracle.
 
-![Route 53 hosted zone creation](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image9.png)
+![Route 53 hosted zone creation](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image9.png)
 
-![Hosted zone successfully created with NS and SOA records](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image2.png)
+![Hosted zone successfully created with NS and SOA records](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image2.png)
 
 ```bash
 # Verify the hosted zone via CLI
@@ -151,11 +151,11 @@ aws route53 list-hosted-zones \
 | `_visual_hash` | TXT | `v=vh1; h=7f83b...` | Anti-phishing browser verification |
 | `_autodiscover` | SRV | `0 0 443 mail...` | Outlook/Mail client auto-configuration |
 
-![Full DNS records table in Route 53](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image46.png)
+![Full DNS records table in Route 53](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image46.png)
 
-![DNS records complete view](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image35.png)
+![DNS records complete view](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image35.png)
 
-![Hosted zone with all records populated](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image33.png)
+![Hosted zone with all records populated](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image33.png)
 
 **Automation Script:** [`dns-record-setup.sh`](https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts/dns-record-setup.sh)
 
@@ -177,7 +177,7 @@ chmod +x hardened-dns-setup.sh
 | OS | Rocky Linux 10 (aarch64) |
 | Security Group | `sg-0c7a7efce68ce2773` — Meq7 - Room 3 - The Real Deal |
 
-![EC2 instance launch script](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image25.png)
+![EC2 instance launch script](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image25.png)
 
 #### Security Group Inbound Rules
 
@@ -203,14 +203,14 @@ aws ec2 modify-instance-attribute \
     --region us-east-1
 ```
 
-![Security group authorization](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image19.png)
+![Security group authorization](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image19.png)
 
 ```bash
 # Connect to the server
 ssh -i thegreatfirewallofchina.pem rocky@54.226.198.180
 ```
 
-![SSH connection verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image8.png)
+![SSH connection verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image8.png)
 
 ---
 
@@ -263,7 +263,7 @@ sudo chmod -R 750 /etc/letsencrypt/live/ /etc/letsencrypt/archive/
 sudo find /etc/letsencrypt/live/ -type d -exec chmod g+s {} +
 ```
 
-![SSL certificate group permission setup](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image29.png)
+![SSL certificate group permission setup](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image29.png)
 
 ---
 
@@ -343,7 +343,7 @@ sudo mkdir -p /etc/nginx/ssl
 sudo openssl dhparam -out /etc/nginx/ssl/dhparam.pem 4096
 ```
 
-![DH parameter generation](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image52.png)
+![DH parameter generation](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image52.png)
 
 ```nginx
 # Reference custom DH parameters in Nginx config
@@ -413,9 +413,9 @@ add_header Cross-Origin-Embedder-Policy "require-corp" always;
 add_header Cross-Origin-Resource-Policy "same-origin" always;
 ```
 
-![Nginx configuration file](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image42.png)
+![Nginx configuration file](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image42.png)
 
-![Nginx configuration continued](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image40.png)
+![Nginx configuration continued](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image40.png)
 
 #### HTTP → HTTPS Force Redirect
 
@@ -469,9 +469,9 @@ sudo systemctl start nginx && sudo systemctl enable nginx
 sudo ss -tulpn | grep -E ':(80|443)'
 ```
 
-![Nginx service deployment](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image41.png)
+![Nginx service deployment](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image41.png)
 
-![Port verification output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image49.png)
+![Port verification output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image49.png)
 
 #### Nginx Process Isolation ("Jailing")
 
@@ -486,7 +486,7 @@ NoNewPrivileges=yes
 
 #### SSL Labs — A+ Result (Web Server)
 
-![SSL Labs A+ rating for gwallofchina.yulcyberhub.click](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image57.png)
+![SSL Labs A+ rating for gwallofchina.yulcyberhub.click](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image57.png)
 
 **Results:**
 - Overall Rating: **A+**
@@ -497,7 +497,7 @@ NoNewPrivileges=yes
 
 **Source:** https://www.ssllabs.com/ssltest/analyze.html?d=gwallofchina.yulcyberhub.click&s=54.226.198.180
 
-![Website front-end appearance](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image30.png)
+![Website front-end appearance](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image30.png)
 
 ---
 
@@ -586,13 +586,13 @@ openssl s_client -connect mail.gwallofchina.yulcyberhub.click:993 -quiet
 - Handshake: **TLS v1.3 / AES-256-GCM**
 - Status: **Verify return code: 0 (ok)**
 
-![SMTPS port 465 cryptographic verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image50.png)
+![SMTPS port 465 cryptographic verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image50.png)
 
-![IMAPS port 993 Dovecot banner](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image36.png)
+![IMAPS port 993 Dovecot banner](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image36.png)
 
 #### SSL Labs — A+ Result (Mail Server)
 
-![SSL Labs A+ for mail.gwallofchina.yulcyberhub.click](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image57.png)
+![SSL Labs A+ for mail.gwallofchina.yulcyberhub.click](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image57.png)
 
 **Source:** https://www.ssllabs.com/ssltest/analyze.html?d=mail.gwallofchina.yulcyberhub.click
 
@@ -673,7 +673,7 @@ submissions inet n - n - - smtpd
 sudo ss -tulpn | grep -E ':(465|587|993)'
 ```
 
-![Port 465/587/993 verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image23.png)
+![Port 465/587/993 verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image23.png)
 
 #### SendGrid Relay (Phase 3 — Production Outbound)
 
@@ -719,7 +719,7 @@ sudo tail -n 20 /var/log/maillog
 # Look for: relay=smtp.sendgrid.net, status=sent, 250 Ok
 ```
 
-![Email delivery verification in Gmail](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image20.png)
+![Email delivery verification in Gmail](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image20.png)
 
 ---
 
@@ -887,7 +887,7 @@ sudo postmap lmdb:/etc/postfix/sasl_passwd
 **Result:** AWS Error — "Route 53 does not support DNSSEC for the TLD of this hosted zone."  
 **Root Cause:** The `.click` TLD registry does not support DNSSEC chain of trust. DNSSEC requires hierarchical validation from Root (`.`) → TLD (`.click`) → Domain. The parent zone DS record delegation is impossible until the TLD operator enables it.
 
-![DNSSEC signing attempt in Route 53](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image39.png)
+![DNSSEC signing attempt in Route 53](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image39.png)
 
 **Risk Mitigation:** Alternative validation mechanisms implemented:
 - CAA records restrict unauthorized CA issuance
@@ -906,7 +906,7 @@ delv @1.1.1.1 gwallofchina.yulcyberhub.click
 dig +dnssec MX gwallofchina.yulcyberhub.click
 ```
 
-![DNSSEC delv verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image21.png)
+![DNSSEC delv verification](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image21.png)
 
 #### CNAME Loop in SendGrid DNS
 
@@ -950,9 +950,9 @@ The complete hardening was validated using a custom verification script:
 [PASS] Server header: no version disclosed (nginx)
 ```
 
-![NGINX VERIFY script output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image44.png)
+![NGINX VERIFY script output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image44.png)
 
-![Nginx verification terminal full output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/Optimizing_SSL_Certificates/images/image31.png)
+![Nginx verification terminal full output](https://raw.githubusercontent.com/mrblue223/CyberSecurity_School_Labs/main/SSL2/images/image31.png)
 
 **All Scripts:**
 
