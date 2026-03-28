@@ -718,14 +718,6 @@ During the period before the DS record was added, the following compensating con
 
 ---
 
-**Challenge 3 — CSP `unsafe-inline`**
-
-The Content Security Policy includes `'unsafe-inline'` for `style-src` and `script-src`, which weakens XSS protection by allowing inline scripts and styles. This was required by the current application architecture.
-
-*Planned mitigation:* Migration to nonce-based CSP (`'nonce-{random}'`), generating a fresh cryptographic nonce per request. This maintains inline script functionality while blocking injected scripts that lack the nonce.
-
----
-
 **Challenge 4 — SSH Port 22 Partially Open**
 
 The security group configuration includes both a team-specific IP (`204.244.197.216/32`) and `0.0.0.0/0` for SSH — deliberate for lab operational flexibility:
