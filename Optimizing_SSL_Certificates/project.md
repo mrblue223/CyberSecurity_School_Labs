@@ -1072,8 +1072,8 @@ sudo ./nginx_verify3.0.sh
 
 | Version | Date | Author | Changes |
 |---|---|---|---|
-| 3.0 | 2026-02-25 | Sammy Roy | Initial hardened infrastructure documentation |
-| 3.1 | 2026-03-28 | Sammy Roy | Assignment reflection + 40 screenshots + DNSSEC step-by-step |
+| 3.0 | 2026-02-25 | Sammy Roy / Paulo Borelli | Initial hardened infrastructure documentation |
+| 3.1 | 2026-03-28 | Sammy Roy / Paulo Borelli /  Keeshon Bain / Marc-Olivier Hélie | Assignment reflection + 40 screenshots + DNSSEC step-by-step |
 | 3.2 | 2026-03-28 | Sammy Roy | +20 screenshots: Dovecot, Postfix SASL, SMTPS, delv, DNSViz |
 | 3.3 | 2026-03-28 | Sammy Roy / Keeshon Bain | Full restructure: deployment-flow order (CLI → DNS → EC2 → Nginx → Postfix) |
 | 3.4 | 2026-03-28 | Paulo Borelli  | Added SSO step-by-step, EC2 launch script (`launch-instance.sh`), IMDSv2 hardening |
