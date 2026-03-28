@@ -55,8 +55,6 @@ The live web server — served over HTTPS with a hardened Nginx configuration �
 ![Nginx Landing Page](images/image14.png)
 *The "Great Wall" Nginx landing page served over TLS 1.3. Banner reads: "TEAM 3 — NGINX DIVISION · SSL / TLS · A+ Rated · Secure Connection".*
 
-*Alternate view of the live "Great Wall" landing page confirming the A+ rated connection badge is rendered in the browser.*
-
 ---
 
 ## 1. SSL/TLS Configuration for Nginx
