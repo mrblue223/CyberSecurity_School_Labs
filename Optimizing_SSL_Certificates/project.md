@@ -14,6 +14,17 @@
 
 ---
 
+## 👥 Team Contributions
+
+| Team Member | Role | Key Contributions |
+|---|---|---|
+| **Sammy Roy** | Infrastructure Lead | SSL/TLS configuration (Nginx + Postfix/Dovecot) · DNSSEC implementation & setup (KMS CMK, KSK, zone signing) · DNS record architecture (18 records) · Certificate hardening · Security headers · Cipher suite selection · Automated verification scripts · Full documentation (60 screenshots) |
+| **Paulo Borelli** | IAM & Automation Lead | AWS CLI setup documentation · AWS SSO authentication guide (eliminate static credentials) · IAM hardening policies (Instance-Based Access Control + Machine Identity profiles) · S3 anti-ransomware guardrails · `launch-instance.sh` EC2 launch automation script · IMDSv2 enforcement (`HttpTokens=required`) against SSRF |
+| **Keeshon Bain** | Architecture & Consulting | Deployment-flow restructure (CLI → DNS → EC2 → Nginx → Postfix) · Technical consulting across all phases |
+| **Marc-Olivier Hélie** | Documentation | Assignment reflection · Screenshot documentation |
+
+---
+
 ## 📋 Table of Contents
 
 - [Executive Summary](#executive-summary)
@@ -1065,18 +1076,6 @@ sudo ./nginx_verify3.0.sh
 | AWS KMS Key Policies | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
 
 ---
-
-<div align="center">
-
-**Document Control**
-
-| Version | Date | Author | Changes |
-|---|---|---|---|
-| 3.0 | 2026-02-25 | Sammy Roy / Paulo Borelli | Initial hardened infrastructure documentation |
-| 3.1 | 2026-03-28 | Sammy Roy / Paulo Borelli /  Keeshon Bain / Marc-Olivier Hélie | Assignment reflection + 40 screenshots + DNSSEC step-by-step |
-| 3.2 | 2026-03-28 | Sammy Roy | +20 screenshots: Dovecot, Postfix SASL, SMTPS, delv, DNSViz |
-| 3.3 | 2026-03-28 | Sammy Roy / Keeshon Bain / Paulo Borelli | Full restructure: deployment-flow order (CLI → DNS → EC2 → Nginx → Postfix) |
-| 3.4 | 2026-03-28 | Sammy Roy / Paulo Borelli  | Added SSO step-by-step, EC2 launch script (`launch-instance.sh`), IMDSv2 hardening |
 
 *Next Review: 2026-06-25 (Quarterly Security Assessment)*  
 *Distribution: Cyber Defense Team · Operations Center · Compliance Office*
