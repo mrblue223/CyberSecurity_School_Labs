@@ -918,9 +918,3 @@ echo "Build Complete" | mail -s "AEC Final Audit" \
 </div>
 
 ---
-
-> **📁 Image Setup for GitHub:**  
-> Place all screenshot files in an `images/` folder at the root of your repository alongside this `README.md`.  
-> **Batch 1** (from first submission): `image1.png` – `image20.png`  
-> **Batch 2** (from second submission): `image21.png` – `image40.png`  
-> **Batch 3** (from third submission): `image41.png` – `image60.png`
