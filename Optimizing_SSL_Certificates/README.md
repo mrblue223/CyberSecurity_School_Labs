@@ -3,15 +3,14 @@
 > **Author:** Sammy Roy · **Cohort:** MEQ7 · **Team:** Team 3  
 > **Domain:** `gwallofchina.yulcyberhub.click` · **Due:** April 2, 2026
 
-![SSL Labs](https://img.shields.io/badge/SSL%20Labs-A%2B-brightgreen?style=for-the-badge&logo=letsencrypt)
-![TLS](https://img.shields.io/badge/TLS-1.3-blue?style=for-the-badge&logo=openssl)
-![Let's Encrypt](https://img.shields.io/badge/Certificate-Let's%20Encrypt-orange?style=for-the-badge&logo=letsencrypt)
-![AWS](https://img.shields.io/badge/DNS-AWS%20Route%2053-FF9900?style=for-the-badge&logo=amazonaws)
-![Rocky Linux](https://img.shields.io/badge/OS-Rocky%20Linux-10B981?style=for-the-badge&logo=rockylinux)
-![DNSSEC](https://img.shields.io/badge/DNSSEC-Chain%20Established-purple?style=for-the-badge)
-![DMARC](https://img.shields.io/badge/DMARC-p%3Dreject-red?style=for-the-badge)
-![License](https://img.shields.io/badge/Classification-Internal%20Technical%20Doc-lightgrey?style=for-the-badge)
-
+![SSL Labs](https://img.shields.io/badge/SSL_Labs-A%2B-44bb00?style=flat&logo=letsencrypt)
+![TLS](https://img.shields.io/badge/TLS-1.3-007acc?style=flat&logo=openssl)
+![Let's Encrypt](https://img.shields.io/badge/Certificate-Let's_Encrypt-ff8c00?style=flat&logo=letsencrypt)
+![AWS](https://img.shields.io/badge/DNS-AWS_Route_53-232F3E?style=flat&logo=amazon-aws)
+![Rocky Linux](https://img.shields.io/badge/OS-Rocky_Linux-10B981?style=flat&logo=rockylinux)
+![DNSSEC](https://img.shields.io/badge/DNSSEC-Chain_Established-6a32b9?style=flat)
+![DMARC](https://img.shields.io/badge/DMARC-p%3Dreject-d32f2f?style=flat)
+![Classification](https://img.shields.io/badge/Classification-Internal_Technical_Doc-555555?style=flat)
 ---
 
 ## 👥 Team Contributions
