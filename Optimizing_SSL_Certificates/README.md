@@ -1046,33 +1046,33 @@ sudo ./nginx_verify3.0.sh
 
 ## References
 
-| Resource | URL |
-|---|---|
-| [1] Mozilla SSL Configuration Generator | https://ssl-config.mozilla.org |
-| [2] Qualys SSL Labs Server Test | https://www.ssllabs.com/ssltest/ |
-| [3] RFC 8446 — TLS 1.3 | https://datatracker.ietf.org/doc/html/rfc8446 |
-| [4] RFC 8996 — Deprecating TLS 1.0 & 1.1 | https://datatracker.ietf.org/doc/html/rfc8996 |
-| [5] RFC 7489 — DMARC | https://datatracker.ietf.org/doc/html/rfc7489 |
-| [6] RFC 8461 — MTA-STS | https://datatracker.ietf.org/doc/html/rfc8461 |
-| [7] RFC 8659 — CAA Records | https://datatracker.ietf.org/doc/html/rfc8659 |
-| [8] RFC 4033/4034/4035 — DNSSEC | https://datatracker.ietf.org/doc/html/rfc4033 |
-| [9] Let's Encrypt Documentation | https://letsencrypt.org/docs/ |
-| [10] Certbot Documentation | https://certbot.eff.org/docs/ |
-| [11] NIST SP 800-52 Rev. 2 — TLS Guidelines | https://csrc.nist.gov/publications/detail/sp/800-52/rev-2/final |
-| [12] Logjam Attack (CVE-2015-4000) | https://weakdh.org |
-| [13] POODLE Attack (CVE-2014-3566) | https://www.openssl.org/~bodo/ssl-poodle.pdf |
-| [14] BEAST Attack (CVE-2011-3389) | https://nvd.nist.gov/vuln/detail/CVE-2011-3389 |
-| [15] HSTS Preload List | https://hstspreload.org |
-| [16] Lynis Security Auditing Tool | https://github.com/CISofy/lynis |
-| [17] aws-vault (ByteNess fork) | https://github.com/ByteNess/aws-vault |
-| [18] DNSViz DNSSEC Visualizer | https://dnsviz.net |
-| [19] Project Scripts Repository | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
-| [20] Nginx SSL/TLS Documentation | https://nginx.org/en/docs/http/ngx_http_ssl_module.html |
-| [21] Postfix TLS README | https://www.postfix.org/TLS_README.html |
-| [22] Dovecot SSL Configuration | https://doc.dovecot.org/configuration_manual/dovecot_ssl_configuration/ |
-| [23] SendGrid DKIM Authentication | https://docs.sendgrid.com/ui/account-and-settings/dkim-records |
-| [24] AWS Route 53 DNSSEC | https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html |
-| [25] AWS KMS Key Policies | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
+| # | Author(s) | Title | Type | Year | URL |
+|---|-----------|-------|------|------|-----|
+| [1] | Mozilla Foundation | Mozilla SSL Configuration Generator | Tool | 2024 | https://ssl-config.mozilla.org |
+| [2] | Qualys, Inc. | SSL Labs Server Test | Tool | 2024 | https://www.ssllabs.com/ssltest/ |
+| [3] | E. Rescorla | The Transport Layer Security (TLS) Protocol Version 1.3 — RFC 8446 | RFC | 2018 | https://datatracker.ietf.org/doc/html/rfc8446 |
+| [4] | K. Moriarty and S. Farrell | Deprecating TLS 1.0 and TLS 1.1 — RFC 8996 | RFC | 2021 | https://datatracker.ietf.org/doc/html/rfc8996 |
+| [5] | M. Kucherawy and E. Zwicky | Domain-based Message Authentication, Reporting, and Conformance (DMARC) — RFC 7489 | RFC | 2015 | https://datatracker.ietf.org/doc/html/rfc7489 |
+| [6] | D. Margolis et al. | SMTP Service Extension for Strict Transport Security (MTA-STS) — RFC 8461 | RFC | 2018 | https://datatracker.ietf.org/doc/html/rfc8461 |
+| [7] | P. Hallam-Baker et al. | DNS Certification Authority Authorization (CAA) Resource Record — RFC 8659 | RFC | 2019 | https://datatracker.ietf.org/doc/html/rfc8659 |
+| [8] | R. Arends et al. | DNS Security Introduction and Requirements — RFC 4033 | RFC | 2005 | https://datatracker.ietf.org/doc/html/rfc4033 |
+| [9] | Let's Encrypt | Let's Encrypt Documentation | Docs | 2024 | https://letsencrypt.org/docs/ |
+| [10] | Electronic Frontier Foundation | Certbot Documentation | Docs | 2024 | https://certbot.eff.org/docs/ |
+| [11] | K. McKay et al. | Guidelines for the Selection, Configuration, and Use of TLS Implementations — NIST SP 800-52 Rev. 2 | Standard | 2019 | https://csrc.nist.gov/publications/detail/sp/800-52/rev-2/final |
+| [12] | D. Adrian et al. | Imperfect Forward Secrecy: How Diffie-Hellman Fails in Practice (Logjam Attack) | Research | 2015 | https://weakdh.org |
+| [13] | B. Möller, T. Duong, and K. Kotowicz | This POODLE Bites: Exploiting The SSL 3.0 Fallback | Research | 2014 | https://www.openssl.org/~bodo/ssl-poodle.pdf |
+| [14] | T. Duong and J. Rizzo | Here Come The ⊕ Ninjas (BEAST Attack) | Research | 2011 | https://nvd.nist.gov/vuln/detail/CVE-2011-3389 |
+| [15] | Chromium Project | HSTS Preload List Submission | Web | 2024 | https://hstspreload.org |
+| [16] | CISofy | Lynis Security Auditing Tool | Tool | 2024 | https://github.com/CISofy/lynis |
+| [17] | ByteNess | aws-vault | Tool | 2024 | https://github.com/ByteNess/aws-vault |
+| [18] | Sandia National Laboratories | DNSViz DNSSEC Visualizer | Tool | 2024 | https://dnsviz.net |
+| [19] | S. Roy | Project Scripts Repository | Code | 2024 | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
+| [20] | Nginx | Module ngx_http_ssl_module | Docs | 2024 | https://nginx.org/en/docs/http/ngx_http_ssl_module.html |
+| [21] | W. Venema | Postfix TLS Support | Docs | 2024 | https://www.postfix.org/TLS_README.html |
+| [22] | Dovecot | Dovecot SSL Configuration | Docs | 2024 | https://doc.dovecot.org/configuration_manual/dovecot_ssl_configuration/ |
+| [23] | Twilio SendGrid | DKIM Records | Docs | 2024 | https://docs.sendgrid.com/ui/account-and-settings/dkim-records |
+| [24] | Amazon Web Services | Configuring DNSSEC signing in Amazon Route 53 | Docs | 2024 | https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html |
+| [25] | Amazon Web Services | Key policies in AWS KMS | Docs | 2024 | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
 
 ---
 
