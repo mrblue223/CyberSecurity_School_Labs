@@ -1049,30 +1049,30 @@ sudo ./nginx_verify3.0.sh
 | Resource | URL |
 |---|---|
 | [1] Mozilla SSL Configuration Generator | https://ssl-config.mozilla.org |
-| Qualys SSL Labs Server Test | https://www.ssllabs.com/ssltest/ |
-| RFC 8446 — TLS 1.3 | https://datatracker.ietf.org/doc/html/rfc8446 |
-| RFC 8996 — Deprecating TLS 1.0 & 1.1 | https://datatracker.ietf.org/doc/html/rfc8996 |
-| RFC 7489 — DMARC | https://datatracker.ietf.org/doc/html/rfc7489 |
-| RFC 8461 — MTA-STS | https://datatracker.ietf.org/doc/html/rfc8461 |
-| RFC 8659 — CAA Records | https://datatracker.ietf.org/doc/html/rfc8659 |
-| RFC 4033/4034/4035 — DNSSEC | https://datatracker.ietf.org/doc/html/rfc4033 |
-| Let's Encrypt Documentation | https://letsencrypt.org/docs/ |
-| Certbot Documentation | https://certbot.eff.org/docs/ |
-| NIST SP 800-52 Rev. 2 — TLS Guidelines | https://csrc.nist.gov/publications/detail/sp/800-52/rev-2/final |
-| Logjam Attack (CVE-2015-4000) | https://weakdh.org |
-| POODLE Attack (CVE-2014-3566) | https://www.openssl.org/~bodo/ssl-poodle.pdf |
-| BEAST Attack (CVE-2011-3389) | https://nvd.nist.gov/vuln/detail/CVE-2011-3389 |
-| HSTS Preload List | https://hstspreload.org |
-| Lynis Security Auditing Tool | https://github.com/CISofy/lynis |
-| aws-vault (ByteNess fork) | https://github.com/ByteNess/aws-vault |
-| DNSViz DNSSEC Visualizer | https://dnsviz.net |
-| Project Scripts Repository | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
-| Nginx SSL/TLS Documentation | https://nginx.org/en/docs/http/ngx_http_ssl_module.html |
-| Postfix TLS README | https://www.postfix.org/TLS_README.html |
-| Dovecot SSL Configuration | https://doc.dovecot.org/configuration_manual/dovecot_ssl_configuration/ |
-| SendGrid DKIM Authentication | https://docs.sendgrid.com/ui/account-and-settings/dkim-records |
-| AWS Route 53 DNSSEC | https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html |
-| AWS KMS Key Policies | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
+| [2] Qualys SSL Labs Server Test | https://www.ssllabs.com/ssltest/ |
+| [3] RFC 8446 — TLS 1.3 | https://datatracker.ietf.org/doc/html/rfc8446 |
+| [4] RFC 8996 — Deprecating TLS 1.0 & 1.1 | https://datatracker.ietf.org/doc/html/rfc8996 |
+| [5] RFC 7489 — DMARC | https://datatracker.ietf.org/doc/html/rfc7489 |
+| [6] RFC 8461 — MTA-STS | https://datatracker.ietf.org/doc/html/rfc8461 |
+| [7] RFC 8659 — CAA Records | https://datatracker.ietf.org/doc/html/rfc8659 |
+| [8] RFC 4033/4034/4035 — DNSSEC | https://datatracker.ietf.org/doc/html/rfc4033 |
+| [9] Let's Encrypt Documentation | https://letsencrypt.org/docs/ |
+| [10] Certbot Documentation | https://certbot.eff.org/docs/ |
+| [11] NIST SP 800-52 Rev. 2 — TLS Guidelines | https://csrc.nist.gov/publications/detail/sp/800-52/rev-2/final |
+| [12] Logjam Attack (CVE-2015-4000) | https://weakdh.org |
+| [13] POODLE Attack (CVE-2014-3566) | https://www.openssl.org/~bodo/ssl-poodle.pdf |
+| [14] BEAST Attack (CVE-2011-3389) | https://nvd.nist.gov/vuln/detail/CVE-2011-3389 |
+| [15] HSTS Preload List | https://hstspreload.org |
+| [16] Lynis Security Auditing Tool | https://github.com/CISofy/lynis |
+| [17] aws-vault (ByteNess fork) | https://github.com/ByteNess/aws-vault |
+| [18] DNSViz DNSSEC Visualizer | https://dnsviz.net |
+| [19] Project Scripts Repository | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
+| [20] Nginx SSL/TLS Documentation | https://nginx.org/en/docs/http/ngx_http_ssl_module.html |
+| [21] Postfix TLS README | https://www.postfix.org/TLS_README.html |
+| [22] Dovecot SSL Configuration | https://doc.dovecot.org/configuration_manual/dovecot_ssl_configuration/ |
+| [23] SendGrid DKIM Authentication | https://docs.sendgrid.com/ui/account-and-settings/dkim-records |
+| [24] AWS Route 53 DNSSEC | https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html |
+| [25] AWS KMS Key Policies | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
 
 ---
 
