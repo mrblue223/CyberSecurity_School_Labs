@@ -1048,7 +1048,7 @@ sudo ./nginx_verify3.0.sh
 
 | Resource | URL |
 |---|---|
-| Mozilla SSL Configuration Generator | https://ssl-config.mozilla.org |
+| [1] Mozilla SSL Configuration Generator | https://ssl-config.mozilla.org |
 | Qualys SSL Labs Server Test | https://www.ssllabs.com/ssltest/ |
 | RFC 8446 — TLS 1.3 | https://datatracker.ietf.org/doc/html/rfc8446 |
 | RFC 8996 — Deprecating TLS 1.0 & 1.1 | https://datatracker.ietf.org/doc/html/rfc8996 |
