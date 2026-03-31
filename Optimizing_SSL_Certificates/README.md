@@ -1094,6 +1094,7 @@ sudo ./nginx_verify3.0.sh
 
 ---
 
-> **📁 Image Setup for GitHub:**  
-> Create an `images/` folder at the root of your repository alongside this `README.md`.  
-> **Batch 1:** `image1.png` – `image20.png` · **Batch 2:** `image21.png` – `image40.png` · **Batch 3:** `image41.png` – `image60.png`
+
+
+
+
