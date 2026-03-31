@@ -1066,7 +1066,7 @@ sudo ./nginx_verify3.0.sh
 | [16] | CISofy | Lynis Security Auditing Tool | Tool | 2024 | https://github.com/CISofy/lynis |
 | [17] | ByteNess | aws-vault | Tool | 2024 | https://github.com/ByteNess/aws-vault |
 | [18] | Sandia National Laboratories | DNSViz DNSSEC Visualizer | Tool | 2024 | https://dnsviz.net |
-| [19] | S. Roy | Project Scripts Repository | Code | 2024 | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
+| [19] | S. Roy, P. Vorperian | Project Scripts Repository | Code | 2024 | https://github.com/mrblue223/CyberSecurity_School_Labs/tree/main/Optimizing_SSL_Certificates/scripts |
 | [20] | Nginx | Module ngx_http_ssl_module | Docs | 2024 | https://nginx.org/en/docs/http/ngx_http_ssl_module.html |
 | [21] | W. Venema | Postfix TLS Support | Docs | 2024 | https://www.postfix.org/TLS_README.html |
 | [22] | Dovecot | Dovecot SSL Configuration | Docs | 2024 | https://doc.dovecot.org/configuration_manual/dovecot_ssl_configuration/ |
