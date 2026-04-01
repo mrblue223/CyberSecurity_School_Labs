@@ -1148,6 +1148,10 @@ A custom Node.js webmail application is deployed at `https://mail.gwallofchina.y
     └── index.html     ← Frontend UI
 ```
 
+**Looking at the app**
+
+![IMAPS from Rocky Linux](images/webmail_app.png)
+
 **Installation:**
 
 ```bash
