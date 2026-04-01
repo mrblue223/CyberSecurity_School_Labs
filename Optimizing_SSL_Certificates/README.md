@@ -267,7 +267,7 @@ CAA records restrict certificate issuance to Let's Encrypt only — preventing r
 
 | Record | Type | Value | Mechanism |
 |---|---|---|---|
-| `@` | MX | `10 mail.gwallofchina.yulcyberhub.click` | Mail routing |
+| `@` | MX | `10 mx.sendgrid.net` | Mail routing |
 | `@` | TXT | `v=spf1 ip4:54.226.198.180 mx -all` | SPF hard fail |
 | `_dmarc` | TXT | `v=DMARC1; p=reject; ...` | Reject spoofed mail |
 | `s1._domainkey` | CNAME | SendGrid DKIM endpoint | Auto-rotating DKIM |
