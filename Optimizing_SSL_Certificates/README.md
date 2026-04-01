@@ -1267,7 +1267,7 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 | IMAP Port | `993` (SSL/TLS) |
 | SMTP Server | `mail.gwallofchina.yulcyberhub.click` |
 | SMTP Port | `587` (STARTTLS) |
-| Username | Full email address (e.g. `sroy@gwallofchina.yulcyberhub.click`) |
+| Username | Full email address (e.g. `<user>@gwallofchina.yulcyberhub.click`) |
 | Password | Set with `doveadm pw` |
 
 ---
