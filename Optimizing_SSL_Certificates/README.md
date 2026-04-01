@@ -11,6 +11,7 @@
 ![DNSSEC](https://img.shields.io/badge/DNSSEC-Chain_Established-6a32b9?style=flat)
 ![DMARC](https://img.shields.io/badge/DMARC-p%3Dreject-d32f2f?style=flat)
 ![Classification](https://img.shields.io/badge/Classification-Internal_Technical_Doc-555555?style=flat)
+
 ---
 
 ## 👥 Team Contributions
@@ -27,6 +28,7 @@
 ## 📋 Table of Contents
 
 - [Executive Summary](#executive-summary)
+- [Architecture Overview](#architecture-overview)
 - [Phase 1 — AWS CLI & Credential Security](#phase-1--aws-cli--credential-security)
   - [1.1 Threat Model](#11-threat-model)
   - [1.2 Secure Alternatives: SSO vs. aws-vault](#12-secure-alternatives-sso-vs-aws-vault)
@@ -54,8 +56,13 @@
   - [5.3 Protocol Selection](#53-protocol-selection)
   - [5.4 Cipher Suites & Inbound TLS Hardening](#54-cipher-suites--inbound-tls-hardening)
   - [5.5 SMTP Authentication — The Secret Pipe](#55-smtp-authentication--the-secret-pipe)
-  - [5.6 SPF / DKIM / DMARC / MTA-STS](#56-spf--dkim--dmarc--mta-sts)
-  - [5.7 Verification](#57-verification)
+  - [5.6 Virtual Mailbox Configuration](#56-virtual-mailbox-configuration)
+  - [5.7 SendGrid Inbound Parse — Receiving Mail](#57-sendgrid-inbound-parse--receiving-mail)
+  - [5.8 Webmail Application](#58-webmail-application)
+  - [5.9 SPF / DKIM / DMARC / MTA-STS](#59-spf--dkim--dmarc--mta-sts)
+  - [5.10 Adding a New User](#510-adding-a-new-user)
+  - [5.11 Client Mail App Settings](#511-client-mail-app-settings)
+  - [5.12 Verification](#512-verification)
 - [Phase 6 — Challenges & Trade-Offs](#phase-6--challenges--trade-offs)
   - [6.1 Security vs. Compatibility](#61-security-vs-compatibility)
   - [6.2 Performance Considerations](#62-performance-considerations)
@@ -79,6 +86,41 @@ This document is a comprehensive technical reflection on the **"Great Wall"** ha
 
 ![Nginx Landing Page](images/image14.png)
 *The "Great Wall" live Nginx landing page — Team 3, NGINX Division. SSL / TLS · A+ Rated · Secure Connection.*
+
+---
+
+## Architecture Overview
+
+```
+Internet
+    │
+    ▼
+Route 53 (DNS / MX Records → mx.sendgrid.net)
+    │
+    ▼
+SendGrid (Receives inbound mail, POSTs to webhook)
+    │
+    ▼
+AWS Security Group (Ports 80, 443, 587, 993)
+    │
+    ▼
+EC2 Instance (Elastic IP: 54.226.198.180)
+  ├── Nginx (Reverse Proxy — Port 443)
+  │     ├── gwallofchina.yulcyberhub.click  → /var/www/html (castle page)
+  │     └── mail.gwallofchina.yulcyberhub.click → Node.js :3000 (webmail)
+  ├── Postfix (SMTP — Ports 465 / 587 outbound)
+  ├── Dovecot (IMAP — Port 993)
+  ├── Node.js Webmail App (Internal — Port 3000)
+  └── EBS Volume (/var/mail/vhosts)
+    │
+    ▼ (Outbound Mail)
+SendGrid Relay (Port 587)
+    │
+    ▼
+Recipient Mail Servers
+```
+
+> **Note on inbound mail:** AWS throttles port 25 at the account level. All inbound mail is received by SendGrid via `mx.sendgrid.net` and forwarded to the server through the SendGrid Inbound Parse webhook. This bypasses the AWS port 25 restriction while maintaining a legitimate DKIM-signed identity.
 
 ---
 
@@ -206,6 +248,7 @@ aws sso logout
 **Why this matters:** If the Kali workstation were compromised, an attacker would find no extractable AWS keys in `~/.aws/credentials` — only encrypted keyring entries (aws-vault) or expired SSO cache tokens. This directly mitigates the most common AWS credential compromise vector: credential file theft.
 
 ---
+
 ## Phase 2 — DNS Infrastructure
 
 ### 2.1 Creating the Hosted Zone
@@ -267,13 +310,15 @@ CAA records restrict certificate issuance to Let's Encrypt only — preventing r
 
 | Record | Type | Value | Mechanism |
 |---|---|---|---|
-| `@` | MX | `10 mx.sendgrid.net` | Mail routing |
+| `@` | MX | `10 mx.sendgrid.net` | Mail routing (SendGrid Inbound Parse) |
 | `@` | TXT | `v=spf1 ip4:54.226.198.180 mx -all` | SPF hard fail |
 | `_dmarc` | TXT | `v=DMARC1; p=reject; ...` | Reject spoofed mail |
 | `s1._domainkey` | CNAME | SendGrid DKIM endpoint | Auto-rotating DKIM |
 | `s2._domainkey` | CNAME | SendGrid DKIM endpoint | Redundant DKIM |
 | `_mta-sts` | TXT | `v=STSv1; id=20240101...` | SMTP TLS enforcement |
 | `_smtp._tls` | TXT | `v=TLSRPTv1; rua=...` | TLS failure reporting |
+
+> **Critical:** The MX record points to `mx.sendgrid.net`, **not** directly to the EC2 instance. SendGrid receives all inbound mail and forwards it to the server via HTTP webhook (Inbound Parse). This is the intended architecture given AWS's port 25 throttling at the account level.
 
 The SendGrid DNS records (CNAME-based DKIM) were generated directly from the SendGrid Sender Authentication dashboard:
 
@@ -457,12 +502,12 @@ After running the script, the resulting instance was verified:
 |---|---|
 | Instance ID | `i-0b71d405f8ad5f73b` |
 | Instance Type | `t4g.small` (ARM64 / Graviton2) |
-| Public IP | `54.226.198.180` |
+| Public IP | `54.226.198.180` (Elastic IP — persistent across reboots) |
 | OS | Rocky Linux 10 (aarch64) |
 | Name Tag | `Web-Server-Server` |
 | Security Group | `sg-0c7a7efce68ce2773` |
 
-The instance is attached to a **single** security group — no additional groups — minimizing the attack surface.
+The instance is attached to a **single** security group — no additional groups — minimizing the attack surface. A dedicated EBS volume is mounted at `/var/mail` for mailbox storage, with an `/etc/fstab` entry ensuring it mounts automatically on reboot. The PTR (reverse DNS) record is set to `mail.gwallofchina.yulcyberhub.click` via EC2 → Elastic IPs → Update Reverse DNS.
 
 ### 3.3 Security Group Rules
 
@@ -473,12 +518,15 @@ The instance is attached to a **single** security group — no additional groups
 | Port | Protocol | Source | Purpose |
 |---|---|---|---|
 | 80 | TCP | 0.0.0.0/0 | HTTP → HTTPS redirect |
-| 443 | TCP | 0.0.0.0/0 | HTTPS (web) |
+| 443 | TCP | 0.0.0.0/0 | HTTPS (web + webmail) |
 | 465 | TCP | 0.0.0.0/0 | SMTPS (implicit TLS) |
+| 587 | TCP | 0.0.0.0/0 | SMTP submission (outbound via SendGrid) |
 | 993 | TCP | 0.0.0.0/0 | IMAPS (implicit TLS) |
 | 22 | TCP | 204.244.197.216/32 + 0.0.0.0/0 | SSH (team IP + open for lab) |
 
 > **Note on port 22:** The open `0.0.0.0/0` rule is a documented lab concession for operational flexibility. Production environments must restrict SSH to bastion hosts or use EC2 Instance Connect with IAM-enforced OS user restrictions.
+
+> **Note on port 25:** AWS throttles outbound port 25 at the account level on EC2. Inbound mail is handled via SendGrid Inbound Parse rather than direct SMTP reception. This is the intended architecture.
 
 ![Security Group Table Output](images/image7.png)
 *`aws ec2 describe-security-groups --output table` — all inbound rules confirmed. Tags: Team=Room3, Cohort=MEQ7.*
@@ -496,13 +544,14 @@ The instance is attached to a **single** security group — no additional groups
 | SSH | `ssh -i thegreatfirewallofchina.pem ec2-user@IP` |
 
 ---
+
 ## Phase 4 — Nginx Web Server Hardening
 
 ### 4.1 SSL Certificate Choice
 
 **Certificate Type:** Let's Encrypt Domain Validated (DV) with Subject Alternative Names (SAN)
 
-A single certificate covers both the web and mail services, verified by SSL Labs:
+A single certificate covers the web server, mail server, and webmail app, verified by SSL Labs:
 
 ![SSL Labs A+ Web Server](images/image27.png)
 *Qualys SSL Labs — `gwallofchina.yulcyberhub.click` at IP `54.226.198.180`: **A+** in 53.92 seconds. Assessed Wed, 25 Mar 2026.*
@@ -518,13 +567,25 @@ A single certificate covers both the web and mail services, verified by SSL Labs
 | **Trust** | ISRG Root X1 — trusted by all major browsers and mail clients |
 | **Automation** | Certbot + systemd timer handles 90-day renewal |
 | **Transparency** | All issuances logged in CT logs for monitoring |
-| **Unified identity** | Single SAN cert shared across Nginx, Postfix, Dovecot |
+| **Unified identity** | Single SAN cert shared across Nginx, Postfix, Dovecot, and the Node.js webmail app |
+
+**Certificate provisioning:**
+
+```bash
+sudo certbot --nginx --expand \
+  -d gwallofchina.yulcyberhub.click \
+  -d mail.gwallofchina.yulcyberhub.click
+```
 
 **Certificate chain:**
 
 ```
 ISRG Root X1 → Let's Encrypt E8 → gwallofchina.yulcyberhub.click
 ```
+
+**Certificate path:** `/etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem`  
+**Auto-renewal:** Managed by Certbot systemd timer  
+**Expiry:** 2026-06-30
 
 ![HTTPS Certificate Chain from Kali](images/image26.png)
 *`openssl s_client -connect gwallofchina.yulcyberhub.click:443` from Kali — depth=2 ISRG Root X1 → depth=1 Let's Encrypt E8 → depth=0 domain. EC (prime256v1) key, ecdsa-with-SHA384. Valid Mar 25 → Jun 23 2026.*
@@ -609,7 +670,7 @@ sudo openssl dhparam -out /etc/nginx/ssl/dhparam.pem 4096
 ssl_dhparam /etc/nginx/ssl/dhparam.pem;
 ```
 
-Default 1024-bit DH parameters are vulnerable to the Logjam attack (CVE-2015-4000). Custom 4096-bit parameters eliminate this.
+Default 1024-bit DH parameters are vulnerable to the Logjam attack (CVE-2015-4000). Custom 4096-bit parameters eliminate this. The same DH param file is reused by Postfix (`smtpd_tls_dh1024_param_file`) to ensure consistent Logjam mitigation across both services.
 
 **Session ticket hardening:**
 
@@ -652,6 +713,16 @@ add_header Cross-Origin-Resource-Policy "same-origin" always;
 add_header X-Permitted-Cross-Domain-Policies "none" always;
 ```
 
+**Webmail-specific headers** (`/etc/nginx/conf.d/webmail.conf`):
+
+```nginx
+add_header Strict-Transport-Security "max-age=63072000" always;
+add_header X-Frame-Options "DENY" always;
+add_header X-Content-Type-Options "nosniff" always;
+add_header X-XSS-Protection "1; mode=block" always;
+add_header Referrer-Policy "no-referrer" always;
+```
+
 **OCSP Stapling** — caches revocation status and serves it with the TLS handshake, eliminating client-side OCSP latency and CA privacy leakage:
 
 ```nginx
@@ -668,8 +739,12 @@ resolver_timeout 5s;
 **Rate Limiting (DDoS mitigation):**
 
 ```nginx
+# Main site
 limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
 limit_req zone=mylimit burst=20 nodelay;
+
+# Webmail login endpoint
+limit_req_zone $binary_remote_addr zone=webmail_limit:10m rate=5r/m;
 ```
 
 **Nginx cache directory hardening:**
@@ -687,6 +762,42 @@ sudo chmod 700 /var/cache/nginx
 
 ![Nginx systemd Sandboxing](images/image22.png)
 *`systemctl edit nginx.service` — `PrivateDevices=yes` (no raw device access), `ProtectSystem=strict` (filesystem read-only except /run and /tmp), `ProtectHome=yes` (home directories inaccessible), `NoNewPrivileges=yes` (blocks setuid/setgid escalation). Mandatory access control at the process level.*
+
+**Webmail reverse proxy configuration** (`/etc/nginx/conf.d/webmail.conf`):
+
+```nginx
+server {
+    listen 443 ssl; listen [::]:443 ssl;
+    http2 on;
+    server_name mail.gwallofchina.yulcyberhub.click;
+
+    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    location /api/login {
+        limit_req zone=webmail_limit burst=5 nodelay;
+        proxy_pass http://127.0.0.1:3000;
+    }
+
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        'upgrade';
+    }
+}
+```
+
+> **Important:** Each virtual host must have a unique `server_name` directive. If the webmail config shares the same `server_name` as the main site config, Nginx will serve the castle page for both hostnames.
 
 ---
 
@@ -874,7 +985,200 @@ sudo postconf -e "alias_maps = lmdb:/etc/aliases"
 
 ---
 
-### 5.6 SPF / DKIM / DMARC / MTA-STS
+### 5.6 Virtual Mailbox Configuration
+
+Virtual mailboxes allow Postfix to deliver mail to filesystem paths for multiple users without requiring OS-level user accounts. This is a critical change from the default local delivery setup.
+
+**Key parameters in `/etc/postfix/main.cf`:**
+
+```ini
+# Virtual mailbox setup
+virtual_mailbox_domains = gwallofchina.yulcyberhub.click
+virtual_mailbox_maps    = lmdb:/etc/postfix/vmailbox
+virtual_mailbox_base    = /var/mail/vhosts
+virtual_uid_maps        = static:5000
+virtual_gid_maps        = static:5000
+
+# CRITICAL: Domain must NOT appear in both mydestination and virtual_mailbox_domains
+mydestination = $myhostname, localhost.$mydomain, localhost
+```
+
+> **Critical fix:** Removing `$mydomain` from `mydestination` was essential. A domain cannot exist in both `mydestination` and `virtual_mailbox_domains` — Postfix will reject delivery with a configuration error if both are set simultaneously.
+
+**Virtual mailbox map — `/etc/postfix/vmailbox`:**
+
+```
+pborelli@gwallofchina.yulcyberhub.click   gwallofchina.yulcyberhub.click/pborelli/Maildir/
+kbain@gwallofchina.yulcyberhub.click      gwallofchina.yulcyberhub.click/kbain/Maildir/
+molivier@gwallofchina.yulcyberhub.click   gwallofchina.yulcyberhub.click/molivier/Maildir/
+sroy@gwallofchina.yulcyberhub.click       gwallofchina.yulcyberhub.click/sroy/Maildir/
+```
+
+After any edit, always recompile:
+
+```bash
+sudo postmap lmdb:/etc/postfix/vmailbox
+```
+
+**Maildir provisioning** — Postfix does not create the directory structure automatically:
+
+```bash
+# Create Maildir structure for each user
+sudo mkdir -p /var/mail/vhosts/gwallofchina.yulcyberhub.click/USER/Maildir/{cur,new,tmp}
+sudo chown -R vmail:vmail /var/mail/vhosts/
+sudo chmod -R 700 /var/mail/vhosts/
+
+# Parent directories must remain traversable
+sudo chmod 755 /var/mail
+sudo chmod 755 /var/mail/vhosts
+```
+
+**Required directory permission chain:**
+
+| Path | Owner | Permissions |
+|---|---|---|
+| `/var/mail` | root:mail | 755 |
+| `/var/mail/vhosts` | vmail:vmail | 755 |
+| `/var/mail/vhosts/domain/` | vmail:vmail | 700 |
+| `/var/mail/vhosts/domain/user/` | vmail:vmail | 700 |
+| `/var/mail/vhosts/domain/user/Maildir/` | vmail:vmail | 700 |
+| `/var/mail/vhosts/domain/user/Maildir/new/` | vmail:vmail | 700 |
+
+**Dovecot mail location — `/etc/dovecot/conf.d/10-mail.conf`:**
+
+```ini
+mail_location = maildir:/var/mail/vhosts/%d/%n/Maildir
+```
+
+**Dovecot authentication — `/etc/dovecot/conf.d/auth-passwdfile.conf.ext`:**
+
+```ini
+passdb {
+  driver = passwd-file
+  args   = scheme=SHA512-CRYPT /etc/dovecot/users
+}
+
+userdb {
+  driver = static
+  args   = uid=vmail gid=vmail home=/var/mail/vhosts/%d/%n
+}
+```
+
+In `/etc/dovecot/conf.d/10-auth.conf`:
+
+```ini
+!include auth-passwdfile.conf.ext   # uncommented
+#!include auth-system.conf.ext      # commented out — conflicts with passwd-file
+```
+
+**Dovecot user database — `/etc/dovecot/users`:**
+
+```
+user@domain:{SHA512-CRYPT}HASH:5000:5000::/var/mail/vhosts/domain/user
+```
+
+Generate a password hash with:
+
+```bash
+doveadm pw -s SHA512-CRYPT
+```
+
+---
+
+### 5.7 SendGrid Inbound Parse — Receiving Mail
+
+Because AWS throttles port 25 at the EC2 account level, inbound mail reception is handled through SendGrid's Inbound Parse webhook rather than direct SMTP.
+
+**Flow:**
+
+```
+Sender → mx.sendgrid.net → SendGrid Inbound Parse →
+POST to https://mail.gwallofchina.yulcyberhub.click/api/inbound →
+Node.js webhook writes raw MIME to user's Maildir →
+Dovecot serves it over IMAP
+```
+
+**SendGrid Dashboard Configuration:**
+
+Navigate to **Settings → Inbound Parse → Add Host & URL** and set:
+
+| Field | Value |
+|---|---|
+| Subdomain | (leave empty) |
+| Domain | `gwallofchina.yulcyberhub.click` |
+| Destination URL | `https://mail.gwallofchina.yulcyberhub.click/api/inbound` |
+| Check incoming emails for spam | ✅ Enabled |
+| POST the raw, full MIME message | ✅ Enabled |
+
+> **Critical middleware order in `server.js`:** The `/api/inbound` route **must** be registered **before** `express.json()` middleware. If `express.json()` runs first, it consumes the request body before `multer` can parse the multipart form data sent by SendGrid, causing the webhook to silently fail with a 200 OK but no mail delivered.
+
+```javascript
+// CORRECT order in server.js:
+const upload = multer();
+app.post('/api/inbound', upload.any(), handler);  // ← BEFORE express.json()
+app.use(express.json());                           // ← AFTER inbound route
+```
+
+---
+
+### 5.8 Webmail Application
+
+A custom Node.js webmail application is deployed at `https://mail.gwallofchina.yulcyberhub.click`, providing browser-based mail access authenticated against Dovecot credentials.
+
+**Stack:**
+
+| Component | Technology |
+|---|---|
+| Runtime | Node.js 20 |
+| Framework | Express |
+| IMAP client | imapflow |
+| SMTP send | Nodemailer (via Postfix localhost:25) |
+| Mail parsing | mailparser |
+| File upload / webhook | multer |
+| Process manager | PM2 (runs as root) |
+
+**File structure:**
+
+```
+/opt/webmail/
+├── server.js          ← Express backend
+├── package.json       ← Dependencies
+├── node_modules/      ← Auto-generated by npm install
+└── public/
+    └── index.html     ← Frontend UI
+```
+
+**Installation:**
+
+```bash
+# Node.js 20
+sudo dnf module enable nodejs:20 -y
+sudo dnf install nodejs -y
+
+# App dependencies
+cd /opt/webmail
+npm install
+
+# PM2 — must run as root for vmail directory access
+sudo npm install -g pm2
+sudo /usr/local/bin/pm2 start /opt/webmail/server.js --name webmail
+sudo /usr/local/bin/pm2 save
+sudo /usr/local/bin/pm2 startup
+```
+
+> **PM2 must run as root** because the Node.js process needs write access to `/var/mail/vhosts/` (owned by `vmail`, uid 5000) when the inbound webhook delivers messages. Non-root PM2 instances will fail silently on inbound delivery.
+
+**Features:**
+
+- Login via Dovecot IMAP credentials (full email address as username)
+- Read, send, reply, forward, and delete email
+- Folder switching (Inbox, Sent, Drafts, Trash, Spam)
+- Unread badge count and client-side search
+- Sessions persist for 8 hours with random session secret via environment variable
+
+---
+
+### 5.9 SPF / DKIM / DMARC / MTA-STS
 
 **SPF — Hard Fail:**
 
@@ -919,7 +1223,52 @@ MTA-STS prevents SMTP MitM downgrade attacks by requiring TLS with a valid certi
 
 ---
 
-### 5.7 Verification
+### 5.10 Adding a New User
+
+```bash
+# 1. Add to Postfix virtual mailbox map
+echo "user@gwallofchina.yulcyberhub.click  gwallofchina.yulcyberhub.click/user/Maildir/" \
+  | sudo tee -a /etc/postfix/vmailbox
+
+# 2. Recompile the map
+sudo postmap lmdb:/etc/postfix/vmailbox
+
+# 3. Create the Maildir structure
+sudo mkdir -p /var/mail/vhosts/gwallofchina.yulcyberhub.click/user/Maildir/{cur,new,tmp}
+sudo chown -R vmail:vmail /var/mail/vhosts/
+sudo chmod -R 700 /var/mail/vhosts/
+
+# 4. Fix parent directory permissions (required for traversal)
+sudo chmod 755 /var/mail
+sudo chmod 755 /var/mail/vhosts
+
+# 5. Generate password hash and add to Dovecot
+doveadm pw -s SHA512-CRYPT   # enter password when prompted, copy the hash output
+echo "user@gwallofchina.yulcyberhub.click:{SHA512-CRYPT}HASH:5000:5000::/var/mail/vhosts/gwallofchina.yulcyberhub.click/user" \
+  | sudo tee -a /etc/dovecot/users
+
+# 6. Reload services
+sudo systemctl reload postfix dovecot
+```
+
+---
+
+### 5.11 Client Mail App Settings
+
+For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mail, etc.):
+
+| Setting | Value |
+|---|---|
+| IMAP Server | `mail.gwallofchina.yulcyberhub.click` |
+| IMAP Port | `993` (SSL/TLS) |
+| SMTP Server | `mail.gwallofchina.yulcyberhub.click` |
+| SMTP Port | `587` (STARTTLS) |
+| Username | Full email address (e.g. `sroy@gwallofchina.yulcyberhub.click`) |
+| Password | Set with `doveadm pw` |
+
+---
+
+### 5.12 Verification
 
 **IMAPS (Port 993):**
 
@@ -936,6 +1285,21 @@ MTA-STS prevents SMTP MitM downgrade attacks by requiring TLS with a valid certi
 
 ![SMTPS Port 465 from Kali](images/image59.png)
 *Same from Kali — identical chain and `220 ESMTP Postfix` banner. Confirms port 465 serves correct implicit TLS from any external client.*
+
+**Mailbox verification commands:**
+
+| Task | Command |
+|---|---|
+| Check Postfix mapping | `postmap -q user@domain lmdb:/etc/postfix/vmailbox` |
+| Test Dovecot auth | `sudo doveadm auth test user@domain 'password'` |
+| Check Dovecot user | `sudo doveadm user user@domain` |
+| Watch live mail logs | `sudo tail -f /var/log/maillog` |
+| Check PM2 processes | `sudo /usr/local/bin/pm2 list` |
+| Check Node app logs | `sudo /usr/local/bin/pm2 logs webmail` |
+| Check MX record | `dig MX gwallofchina.yulcyberhub.click` |
+| List mailboxes | `sudo cat /etc/postfix/vmailbox` |
+| List Dovecot users | `sudo cat /etc/dovecot/users` |
+| Check mail folders | `sudo ls /var/mail/vhosts/gwallofchina.yulcyberhub.click/` |
 
 **End-to-End Mail Delivery:**
 
@@ -975,16 +1339,16 @@ Open to `0.0.0.0/0` alongside the team IP for lab operational flexibility. Expli
 
 ### 6.2 Performance Considerations
 
-**DH Parameter Generation:**  
+**DH Parameter Generation:**
 4096-bit DH parameter generation takes 10–20 minutes on t4g.small — one-time cost, not per-connection. Security gain (Logjam mitigation) far outweighs the delay.
 
-**TLS Session Cache:**  
+**TLS Session Cache:**
 10MB shared cache (~40,000 sessions) reduces handshake overhead on returning clients while `ssl_session_tickets off` preserves PFS.
 
-**HTTP/2:**  
+**HTTP/2:**
 HPACK header compression and multiplexed requests reduce page load latency without security trade-offs. Confirmed: `[PASS] HTTP/2: active`.
 
-**ChaCha20-Poly1305:**  
+**ChaCha20-Poly1305:**
 Included specifically for the ARM64 Graviton2 processor — on hardware without AES-NI, ChaCha20 outperforms AES-GCM in software. Both Nginx and Postfix benefit from this cipher being in the priority list.
 
 ---
@@ -1001,6 +1365,13 @@ Included specifically for the ARM64 Graviton2 processor — on hardware without 
 | DNSSEC — KMS permissions error | Initial CMK policy did not grant Route 53 `DescribeKey`, `GetPublicKey`, `Sign` | Updated key policy to include `route53.amazonaws.com` as principal |
 | Certificate permission denied (Postfix/Dovecot) | `/etc/letsencrypt` root-owned only | `ssl-cert` group + `chmod 750` + `g+s` sticky bit |
 | Nginx zombie processes on restart | Improper restart sequence | `pkill -9 nginx` before `systemctl start nginx` |
+| Webmail showing castle page | `gwallofchina.conf` catching all traffic | Separate `server_name` per Nginx config file |
+| Certbot failing on webmail | `webmail.conf` had wrong cert path | Updated to use shared SAN cert path |
+| SendGrid webhook returning 404 | `express.json()` consuming body before `multer` | Moved `/api/inbound` route before all middleware |
+| Maildir not found | Folders not created automatically by Postfix | `mkdir -p .../Maildir/{cur,new,tmp}` |
+| Permission denied writing mail | PM2 running as `rocky` user, not root | Switched to `sudo /usr/local/bin/pm2` |
+| Dovecot permission denied on `/var/mail` | `/var/mail` set to 700 | `chmod 755 /var/mail && chmod 755 /var/mail/vhosts` |
+| `mydestination` + `virtual_mailbox_domains` conflict | Domain listed in both directives | Removed `$mydomain` from `mydestination` |
 
 **Full validation command set:**
 
@@ -1033,6 +1404,15 @@ echo "Build Complete" | mail -s "AEC Final Audit" \
 
 # 8. Automated Nginx verification
 sudo ./nginx_verify3.0.sh
+
+# 9. Postfix virtual mailbox lookup
+postmap -q sroy@gwallofchina.yulcyberhub.click lmdb:/etc/postfix/vmailbox
+
+# 10. Dovecot auth test
+sudo doveadm auth test sroy@gwallofchina.yulcyberhub.click 'password'
+
+# 11. Check webmail process
+sudo /usr/local/bin/pm2 list
 ```
 
 **Final SSL Labs Summary:**
@@ -1041,6 +1421,19 @@ sudo ./nginx_verify3.0.sh
 |---|---|---|---|---|---|
 | `gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | 100 | 100 |
 | `mail.gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | ~90 | ~90 |
+
+**Final Deployment Status:**
+
+| Component | Status |
+|---|---|
+| Outbound mail (SendGrid relay) | ✅ Working |
+| Inbound mail (SendGrid Parse webhook) | ✅ Working |
+| Dovecot IMAP | ✅ Working |
+| Webmail app | ✅ Live at `https://mail.gwallofchina.yulcyberhub.click` |
+| SSL certificate | ✅ Valid until 2026-06-30 |
+| Main website | ✅ Live at `https://gwallofchina.yulcyberhub.click` |
+| User mailboxes | ✅ pborelli, kbain, molivier, sroy |
+| DNSSEC | ✅ Fully validated (chain established) |
 
 ---
 
@@ -1073,6 +1466,10 @@ sudo ./nginx_verify3.0.sh
 | [23] | Twilio SendGrid | DKIM Records | Docs | 2024 | https://docs.sendgrid.com/ui/account-and-settings/dkim-records |
 | [24] | Amazon Web Services | Configuring DNSSEC signing in Amazon Route 53 | Docs | 2024 | https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/dns-configuring-dnssec.html |
 | [25] | Amazon Web Services | Key policies in AWS KMS | Docs | 2024 | https://docs.aws.amazon.com/kms/latest/developerguide/key-policies.html |
+| [26] | Node.js Foundation | Node.js 20 Documentation | Docs | 2024 | https://nodejs.org/en/docs/ |
+| [27] | PM2 | PM2 Process Manager Documentation | Docs | 2024 | https://pm2.keystone.io/docs/ |
+| [28] | Twilio SendGrid | Inbound Parse Webhook | Docs | 2024 | https://docs.sendgrid.com/for-developers/parsing-email/inbound-email |
+| [29] | W. Venema | Postfix Virtual Mailbox Hosting | Docs | 2024 | https://www.postfix.org/VIRTUAL_README.html |
 
 ---
 
@@ -1089,12 +1486,6 @@ sudo ./nginx_verify3.0.sh
 ![Screenshots](https://img.shields.io/badge/Screenshots-60%20embedded-lightgrey?style=flat-square)
 
 *"Security is not a product, but a process."* — Bruce Schneier
-
-</div>
-
----
-
-
 
 
 
