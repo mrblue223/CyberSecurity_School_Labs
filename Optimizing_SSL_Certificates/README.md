@@ -1313,6 +1313,9 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 ![Local Mail Delivery](images/image5.png)
 *Local delivery test: three messages in `/var/spool/mail/root`, `From: Cloud User <rocky@mail.gwallofchina.yulcyberhub.click>`. Postfix local transport confirmed.*
 
+** Receving Mail Via Webmail App**
+![Local Mail Delivery](images/receiving_email_app.png)
+
 **SSL Labs A+ — Mail Server:**
 
 ![SSL Labs A+ Mail Server](images/image39.png)
