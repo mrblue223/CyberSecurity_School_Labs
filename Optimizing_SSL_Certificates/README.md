@@ -294,6 +294,9 @@ The final hosted zone contains 23 records covering all required services and sec
 ![Route 53 All 18 Records](images/image19.png)
 *AWS Route 53 hosted zone — all 18 DNS records visible: A, AAAA, CAA, MX, NS, SOA, TXT (SPF, DMARC, DKIM, MTA-STS), SRV, and CNAME records.*
 
+![Route_53_all_final_records](images/final_dns_records.png)
+*All records after complete configurations)
+
 ![Route 53 Detailed Record Values](images/image35.png)
 *Full record list with values: A (`54.226.198.180`), CAA (`letsencrypt.org` + `amazonaws.com`), MX (`10 mail.*`), NS (four AWS servers), SPF (`v=spf1 ip4:54.226.198.180 mx -all`), DMARC (`p=reject`), DKIM, MTA-STS, `_smtp._tls`, `_visual_hash`, `_autodiscover._tcp` SRV, `mail.` A record, and `www.` CNAME.*
 
@@ -1561,6 +1564,15 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 
 **Receiving Mail Via Webmail App**
 ![Local Mail Delivery](images/receiving_email_app.png)
+
+**Verifying DMARC, DKIM, SPF, MTA-STS:**
+![Local Mail Delivery](images/dmarc.png)
+
+![Local Mail Delivery](images/dkim.png)
+
+![Local Mail Delivery](images/mta_sts.png)
+
+![Local Mail Delivery](images/compliance.png)
 
 **SSL Labs A+ — Mail Server:**
 
