@@ -1797,4 +1797,6 @@ sudo ss -tlnp | grep -E ':(25|465|587|993)'
 ![DNSSEC](https://img.shields.io/badge/DNSSEC-Fully%20Validated-purple?style=flat-square)
 ![Screenshots](https://img.shields.io/badge/Screenshots-60%20embedded-lightgrey?style=flat-square)
 
+
+
 *"Security is not a product, but a process."* — Bruce Schneier
