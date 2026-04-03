@@ -10,6 +10,7 @@
 ![Rocky Linux](https://img.shields.io/badge/OS-Rocky_Linux-10B981?style=flat&logo=rockylinux)
 ![DNSSEC](https://img.shields.io/badge/DNSSEC-Chain_Established-6a32b9?style=flat)
 ![DMARC](https://img.shields.io/badge/DMARC-p%3Dreject-d32f2f?style=flat)
+![OpenDKIM](https://img.shields.io/badge/DKIM-OpenDKIM%20Local%20Signing-0066cc?style=flat)
 ![Classification](https://img.shields.io/badge/Classification-Internal_Technical_Doc-555555?style=flat)
 
 ---
@@ -56,8 +57,9 @@
   - [5.3 Protocol Selection](#53-protocol-selection)
   - [5.4 Cipher Suites & Inbound TLS Hardening](#54-cipher-suites--inbound-tls-hardening)
   - [5.5 SMTP Authentication — The Secret Pipe](#55-smtp-authentication--the-secret-pipe)
+  - [5.5.1 OpenDKIM — Local DKIM Signing](#551-opendkim--local-dkim-signing)
   - [5.6 Virtual Mailbox Configuration](#56-virtual-mailbox-configuration)
-  - [5.7 SendGrid Inbound Parse — Receiving Mail](#57-sendgrid-inbound-parse--receiving-mail)
+  - [5.7 Inbound Mail — Direct SMTP Reception](#57-inbound-mail--direct-smtp-reception)
   - [5.8 Webmail Application](#58-webmail-application)
   - [5.9 SPF / DKIM / DMARC / MTA-STS](#59-spf--dkim--dmarc--mta-sts)
   - [5.10 Adding a New User](#510-adding-a-new-user)
@@ -95,32 +97,39 @@ This document is a comprehensive technical reflection on the **"Great Wall"** ha
 Internet
     │
     ▼
-Route 53 (DNS / MX Records → mx.sendgrid.net)
+Route 53 (DNS · MX → mail.gwallofchina.yulcyberhub.click)
     │
     ▼
-SendGrid (Receives inbound mail, POSTs to webhook)
-    │
-    ▼
-AWS Security Group (Ports 80, 443, 587, 993)
+AWS Security Group (Ports 25, 80, 443, 465, 587, 993)
     │
     ▼
 EC2 Instance (Elastic IP: 54.226.198.180)
   ├── Nginx (Reverse Proxy — Port 443)
-  │     ├── gwallofchina.yulcyberhub.click  → /var/www/html (castle page)
-  │     └── mail.gwallofchina.yulcyberhub.click → Node.js :3000 (webmail)
-  ├── Postfix (SMTP — Ports 465 / 587 outbound)
+  │     ├── gwallofchina.yulcyberhub.click       → /var/www/html (castle page)
+  │     ├── mail.gwallofchina.yulcyberhub.click  → Node.js :3000 (webmail)
+  │     └── mta-sts.gwallofchina.yulcyberhub.click → /var/www/mta-sts (policy file)
+  ├── Postfix (SMTP — Ports 25 inbound · 465 SMTPS · 587 submission)
+  ├── OpenDKIM (DKIM milter — Port 8891 · signs all outbound mail)
   ├── Dovecot (IMAP — Port 993)
   ├── Node.js Webmail App (Internal — Port 3000)
   └── EBS Volume (/var/mail/vhosts)
     │
-    ▼ (Outbound Mail)
-SendGrid Relay (Port 587)
+    ▼ (Inbound Mail — directly to Postfix port 25)
+Sender MTA → MX lookup → mail.gwallofchina.yulcyberhub.click:25
+    │
+    ▼ (Outbound Mail — PRIMARY)
+Direct SMTP to Recipient MX Servers (Port 25 · MX lookup · OpenDKIM signed)
+    │
+    ▼ (Outbound Mail — FALLBACK, activates only if direct delivery fails)
+SendGrid Relay (Port 587 · STARTTLS)
     │
     ▼
 Recipient Mail Servers
 ```
 
-> **Note on inbound mail:** AWS throttles port 25 at the account level. All inbound mail is received by SendGrid via `mx.sendgrid.net` and forwarded to the server through the SendGrid Inbound Parse webhook. This bypasses the AWS port 25 restriction while maintaining a legitimate DKIM-signed identity.
+> **Note on inbound mail:** The MX record points directly to `mail.gwallofchina.yulcyberhub.click` (EC2 instance). Postfix receives inbound mail directly on port 25. Port 25 is open in the AWS security group and unblocked at the account level by Oracle (instructor).
+
+> **Note on outbound mail:** Postfix is configured with an empty `relayhost` (direct delivery via MX lookup) as the **primary** path. All outbound mail is signed by OpenDKIM before leaving the server. `fallback_relay = [smtp.sendgrid.net]:587` activates automatically only when direct delivery fails.
 
 ---
 
@@ -280,7 +289,7 @@ aws route53 list-hosted-zones \
 
 ### 2.2 DNS Record Architecture
 
-The final hosted zone contains 18 records covering all required services and security mechanisms.
+The final hosted zone contains 23 records covering all required services and security mechanisms.
 
 ![Route 53 All 18 Records](images/image19.png)
 *AWS Route 53 hosted zone — all 18 DNS records visible: A, AAAA, CAA, MX, NS, SOA, TXT (SPF, DMARC, DKIM, MTA-STS), SRV, and CNAME records.*
@@ -295,7 +304,8 @@ The final hosted zone contains 18 records covering all required services and sec
 | `@` | A | 54.226.198.180 | IPv4 entry point |
 | `@` | AAAA | `::0` | IPv6 placeholder (future) |
 | `www` | CNAME | `gwallofchina.yulcyberhub.click` | Canonical alias |
-| `mail` | A | 54.226.198.180 | Mail host |
+| `mail` | A | 54.226.198.180 | Mail host (MX target) |
+| `mta-sts` | A | 54.226.198.180 | MTA-STS policy file host |
 
 **CA Authorization Records:**
 
@@ -310,15 +320,16 @@ CAA records restrict certificate issuance to Let's Encrypt only — preventing r
 
 | Record | Type | Value | Mechanism |
 |---|---|---|---|
-| `@` | MX | `10 mx.sendgrid.net` | Mail routing (SendGrid Inbound Parse) |
-| `@` | TXT | `v=spf1 ip4:54.226.198.180 mx -all` | SPF hard fail |
+| `@` | MX | `10 mail.gwallofchina.yulcyberhub.click` | Direct inbound mail to EC2 server |
+| `@` | TXT | `v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all` | SPF — authorizes EC2 IP + SendGrid fallback |
 | `_dmarc` | TXT | `v=DMARC1; p=reject; ...` | Reject spoofed mail |
-| `s1._domainkey` | CNAME | SendGrid DKIM endpoint | Auto-rotating DKIM |
-| `s2._domainkey` | CNAME | SendGrid DKIM endpoint | Redundant DKIM |
-| `_mta-sts` | TXT | `v=STSv1; id=20240101...` | SMTP TLS enforcement |
+| `mail._domainkey` | TXT | `v=DKIM1; k=rsa; p=...` | Local DKIM signing via OpenDKIM (direct send) |
+| `s1._domainkey` | CNAME | SendGrid DKIM endpoint | Auto-rotating DKIM (SendGrid fallback) |
+| `s2._domainkey` | CNAME | SendGrid DKIM endpoint | Redundant DKIM (SendGrid fallback) |
+| `_mta-sts` | TXT | `v=STSv1; id=20260403000000` | SMTP TLS enforcement |
 | `_smtp._tls` | TXT | `v=TLSRPTv1; rua=...` | TLS failure reporting |
 
-> **Critical:** The MX record points to `mx.sendgrid.net`, **not** directly to the EC2 instance. SendGrid receives all inbound mail and forwards it to the server via HTTP webhook (Inbound Parse). This is the intended architecture given AWS's port 25 throttling at the account level.
+> **Critical:** The MX record now points directly to `mail.gwallofchina.yulcyberhub.click` — inbound mail arrives at Postfix on port 25 without any third-party intermediary. **Outbound** mail is signed by OpenDKIM and sent directly via MX lookup. SendGrid acts as outbound fallback only.
 
 The SendGrid DNS records (CNAME-based DKIM) were generated directly from the SendGrid Sender Authentication dashboard:
 
@@ -517,16 +528,17 @@ The instance is attached to a **single** security group — no additional groups
 
 | Port | Protocol | Source | Purpose |
 |---|---|---|---|
+| 25 | TCP | 0.0.0.0/0 | SMTP inbound (direct mail reception) |
 | 80 | TCP | 0.0.0.0/0 | HTTP → HTTPS redirect |
-| 443 | TCP | 0.0.0.0/0 | HTTPS (web + webmail) |
+| 443 | TCP | 0.0.0.0/0 | HTTPS (web + webmail + mta-sts) |
 | 465 | TCP | 0.0.0.0/0 | SMTPS (implicit TLS) |
-| 587 | TCP | 0.0.0.0/0 | SMTP submission (outbound via SendGrid) |
+| 587 | TCP | 0.0.0.0/0 | SMTP submission / SendGrid fallback relay |
 | 993 | TCP | 0.0.0.0/0 | IMAPS (implicit TLS) |
 | 22 | TCP | 204.244.197.216/32 + 0.0.0.0/0 | SSH (team IP + open for lab) |
 
 > **Note on port 22:** The open `0.0.0.0/0` rule is a documented lab concession for operational flexibility. Production environments must restrict SSH to bastion hosts or use EC2 Instance Connect with IAM-enforced OS user restrictions.
 
-> **Note on port 25:** AWS throttles outbound port 25 at the account level on EC2. Inbound mail is handled via SendGrid Inbound Parse rather than direct SMTP reception. This is the intended architecture.
+> **Note on port 25:** Port 25 is open in the security group and unblocked at the AWS account level (actioned by Oracle/instructor). Postfix listens on port 25 for both inbound SMTP reception and outbound direct sending via MX lookup.
 
 ![Security Group Table Output](images/image7.png)
 *`aws ec2 describe-security-groups --output table` — all inbound rules confirmed. Tags: Team=Room3, Cohort=MEQ7.*
@@ -574,7 +586,8 @@ A single certificate covers the web server, mail server, and webmail app, verifi
 ```bash
 sudo certbot --nginx --expand \
   -d gwallofchina.yulcyberhub.click \
-  -d mail.gwallofchina.yulcyberhub.click
+  -d mail.gwallofchina.yulcyberhub.click \
+  -d mta-sts.gwallofchina.yulcyberhub.click
 ```
 
 **Certificate chain:**
@@ -584,8 +597,9 @@ ISRG Root X1 → Let's Encrypt E8 → gwallofchina.yulcyberhub.click
 ```
 
 **Certificate path:** `/etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem`  
+**SAN covers:** `gwallofchina.yulcyberhub.click`, `mail.gwallofchina.yulcyberhub.click`, `mta-sts.gwallofchina.yulcyberhub.click`  
 **Auto-renewal:** Managed by Certbot systemd timer  
-**Expiry:** 2026-06-30
+**Expiry:** 2026-07-02
 
 ![HTTPS Certificate Chain from Kali](images/image26.png)
 *`openssl s_client -connect gwallofchina.yulcyberhub.click:443` from Kali — depth=2 ISRG Root X1 → depth=1 Let's Encrypt E8 → depth=0 domain. EC (prime256v1) key, ecdsa-with-SHA384. Valid Mar 25 → Jun 23 2026.*
@@ -893,9 +907,10 @@ sudo postconf -e "myorigin = \$mydomain"
 
 | Port | Service | Protocol | Rationale |
 |---|---|---|---|
+| 25 | SMTP | Plaintext → STARTTLS | Inbound mail reception + outbound direct sending |
 | 465 | SMTPS | Implicit TLS | No STARTTLS downgrade possible |
 | 993 | IMAPS | Implicit TLS | No STARTTLS downgrade possible |
-| 587 | SMTP Relay | STARTTLS (outbound to SendGrid only) | AWS port 25 blocked |
+| 587 | SMTP Relay | STARTTLS | Used by SendGrid fallback relay (outbound only) |
 
 **Port listening verification:**
 
@@ -924,7 +939,154 @@ sudo postconf -e "smtpd_tls_dh1024_param_file = /etc/nginx/ssl/dhparam.pem"
 
 ### 5.5 SMTP Authentication — The Secret Pipe
 
-AWS blocks outbound port 25 on EC2 by default. All outbound mail is routed through **SendGrid** as an authenticated relay on port 587 (STARTTLS), bypassing this restriction while maintaining a legitimate DKIM-signed identity.
+Postfix is configured to send mail **directly** via SMTP MX lookup as the primary delivery path. SendGrid is configured exclusively as a **fallback relay**, activating automatically only when direct delivery fails — for example, if a destination server rejects our IP, or if a transient network issue prevents a direct connection.
+
+This dual-path architecture is reflected in `main.cf`:
+
+```ini
+# Direct sending with SendGrid fallback
+# Empty relayhost = Postfix performs MX lookup and delivers directly (PRIMARY)
+relayhost =
+
+# SendGrid activates only when direct delivery fails (FALLBACK)
+fallback_relay = [smtp.sendgrid.net]:587
+
+# SendGrid Auth (used only when fallback_relay activates)
+smtp_sasl_auth_enable = yes
+smtp_sasl_password_maps = lmdb:/etc/postfix/sasl_passwd
+smtp_sasl_security_options = noanonymous
+smtp_use_tls = yes
+smtp_tls_security_level = may
+smtp_tls_loglevel = 1
+```
+
+> **Why this design?** Direct sending preserves full control over mail headers and avoids SendGrid rate limits on the free tier. The fallback ensures delivery continuity if direct port 25 access is restricted at the AWS account level. Oracle (instructor) is handling the AWS port 25 unblock request for EC2 instance `54.226.198.180`.
+
+---
+
+### 5.5.1 OpenDKIM — Local DKIM Signing
+
+Direct sending requires a **local DKIM milter** because SendGrid's DKIM selectors (`s1._domainkey`, `s2._domainkey`) only sign mail routed through SendGrid's infrastructure. Mail sent directly via port 25 arrives unsigned at the destination — failing DMARC's `adkim=s` strict alignment and being rejected by Gmail.
+
+**Solution:** OpenDKIM runs as a Postfix milter, signing every outbound message before it leaves the server with a locally generated key published at `mail._domainkey.gwallofchina.yulcyberhub.click`.
+
+**Installation:**
+
+```bash
+sudo dnf install opendkim opendkim-tools -y
+```
+
+**Key generation:**
+
+```bash
+sudo mkdir -p /etc/opendkim/keys/gwallofchina.yulcyberhub.click
+
+sudo opendkim-genkey -b 2048 \
+  -d gwallofchina.yulcyberhub.click \
+  -D /etc/opendkim/keys/gwallofchina.yulcyberhub.click \
+  -s mail -v
+
+sudo chown -R opendkim:opendkim /etc/opendkim/
+```
+
+**`/etc/opendkim.conf`:**
+
+```ini
+Mode                    sv
+Syslog                  yes
+SyslogSuccess           yes
+LogWhy                  yes
+Canonicalization        relaxed/relaxed
+Domain                  gwallofchina.yulcyberhub.click
+Selector                mail
+Socket                  inet:8891@localhost
+PidFile                 /run/opendkim/opendkim.pid
+UserID                  opendkim
+UMask                   007
+OversignHeaders         From
+SigningTable            refile:/etc/opendkim/SigningTable
+KeyTable                /etc/opendkim/KeyTable
+InternalHosts           /etc/opendkim/TrustedHosts
+```
+
+> **Rocky Linux 10 note:** The `TrustAnchorFile` directive must be omitted — `/usr/share/opendkim/effective.trust.anchors` does not exist on Rocky Linux 10 and causes exit code 78 on startup.
+
+**`/etc/opendkim/SigningTable`:**
+
+```
+*@gwallofchina.yulcyberhub.click    mail._domainkey.gwallofchina.yulcyberhub.click
+```
+
+**`/etc/opendkim/KeyTable`:**
+
+```
+mail._domainkey.gwallofchina.yulcyberhub.click    gwallofchina.yulcyberhub.click:mail:/etc/opendkim/keys/gwallofchina.yulcyberhub.click/mail.private
+```
+
+**`/etc/opendkim/TrustedHosts`:**
+
+```
+127.0.0.1
+localhost
+54.226.198.180
+gwallofchina.yulcyberhub.click
+mail.gwallofchina.yulcyberhub.click
+```
+
+**Wire OpenDKIM into Postfix:**
+
+```bash
+sudo postconf -e "milter_default_action = accept"
+sudo postconf -e "milter_protocol = 6"
+sudo postconf -e "smtpd_milters = inet:localhost:8891"
+sudo postconf -e "non_smtpd_milters = inet:localhost:8891"
+sudo systemctl enable --now opendkim
+sudo systemctl restart postfix
+```
+
+**Verify socket is listening:**
+
+```bash
+ss -tlnp | grep 8891
+# Expected: LISTEN 0 4096 127.0.0.1:8891
+```
+
+**DNS record — push to Route 53:**
+
+The public key is split across 3 chunks to stay under the 255-character DNS TXT limit:
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z0433076DMIP84BGAZGN \
+  --profile MEQ7_RBAC_Room3-453875232433 \
+  --change-batch '{
+    "Changes": [{
+      "Action": "CREATE",
+      "ResourceRecordSet": {
+        "Name": "mail._domainkey.gwallofchina.yulcyberhub.click",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [{
+          "Value": "\"v=DKIM1; k=rsa; p=MIIBIjAN...chunk1\" \"chunk2\" \"chunk3\""
+        }]
+      }
+    }]
+  }'
+```
+
+**Verify key is resolvable:**
+
+```bash
+sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
+# Expected: key OK
+```
+
+**Confirm signing in mail logs:**
+
+```
+opendkim[357754]: 70AA1181F800: DKIM-Signature field added (s=mail, d=gwallofchina.yulcyberhub.click)
+postfix/smtp[358515]: 70AA1181F800: relay=gmail-smtp-in.l.google.com[:25], status=sent (250 2.0.0 OK)
+```
 
 **Postfix ↔ Dovecot SASL Integration:**
 
@@ -945,15 +1107,35 @@ sudo systemctl restart postfix
 ![Dovecot unix_listener Config](images/image49.png)
 *`unix_listener /var/spool/postfix/private/auth { mode = 0666; user = postfix; group = postfix }`. Mode `0666` is required because Postfix cannot use `0600` — it runs as its own user and must have socket access. Owner and group are `postfix`, keeping the socket boundary correct. `0777` would allow all users — `0666` restricts to explicit socket connections.*
 
-**Postfix auth socket permissions verified:**
+**`/etc/postfix/master.cf` — key services:**
+
+```
+# SMTP port 25 — inbound reception + outbound direct sending
+smtp      inet  n       -       n       -       -       smtpd
+
+# Submission port 587 — authenticated client relay
+submission inet n       -       n       -       -       smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_tls_auth_only=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+
+# SMTPS port 465 — implicit TLS (no STARTTLS downgrade possible)
+smtps     inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+```
 
 ![Postfix Auth Socket](images/image20.png)
 *`/var/spool/postfix/private/auth` — `srw-rw----` (660). Socket accessible to Postfix and `mail` group only — no world-readable exposure of the SASL channel.*
 
-**SendGrid relay credentials — `/etc/postfix/sasl_passwd`:**
+**SendGrid fallback relay credentials — `/etc/postfix/sasl_passwd`:**
 
 ```bash
-# Store credential (never in plaintext on disk long-term)
+# Store credential (used ONLY when fallback_relay activates)
 echo "[smtp.sendgrid.net]:587 apikey:SG.YOUR_KEY_HERE" \
   | sudo tee /etc/postfix/sasl_passwd
 
@@ -967,7 +1149,9 @@ sudo chmod 0600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.lmdb
 **Full relay and database configuration:**
 
 ```bash
-sudo postconf -e "relayhost = [smtp.sendgrid.net]:587"
+# Leave relayhost empty — direct delivery is primary
+sudo postconf -e "relayhost ="
+sudo postconf -e "fallback_relay = [smtp.sendgrid.net]:587"
 sudo postconf -e "smtp_sasl_auth_enable = yes"
 sudo postconf -e "smtp_sasl_password_maps = lmdb:/etc/postfix/sasl_passwd"
 sudo postconf -e "smtp_sasl_security_options = noanonymous"
@@ -1085,39 +1269,42 @@ doveadm pw -s SHA512-CRYPT
 
 ---
 
-### 5.7 SendGrid Inbound Parse — Receiving Mail
+### 5.7 Inbound Mail — Direct SMTP Reception
 
-Because AWS throttles port 25 at the EC2 account level, inbound mail reception is handled through SendGrid's Inbound Parse webhook rather than direct SMTP.
+Inbound mail is now received directly by Postfix on port 25. The MX record points to `mail.gwallofchina.yulcyberhub.click` (EC2 instance). Port 25 is open in the security group and unblocked at the AWS account level by Oracle (instructor).
 
-**Flow:**
+**Inbound mail flow:**
 
 ```
-Sender → mx.sendgrid.net → SendGrid Inbound Parse →
-POST to https://mail.gwallofchina.yulcyberhub.click/api/inbound →
-Node.js webhook writes raw MIME to user's Maildir →
-Dovecot serves it over IMAP
+Sender MTA
+    │
+    ▼ (DNS MX lookup)
+mail.gwallofchina.yulcyberhub.click:25
+    │
+    ▼
+Postfix (smtpd) → virtual transport → Dovecot LMTP
+    │
+    ▼
+/var/mail/vhosts/gwallofchina.yulcyberhub.click/user/Maildir/
+    │
+    ▼
+Dovecot IMAP → Webmail or mail client
 ```
 
-**SendGrid Dashboard Configuration:**
+**Verify Postfix is listening for inbound mail:**
 
-Navigate to **Settings → Inbound Parse → Add Host & URL** and set:
-
-| Field | Value |
-|---|---|
-| Subdomain | (leave empty) |
-| Domain | `gwallofchina.yulcyberhub.click` |
-| Destination URL | `https://mail.gwallofchina.yulcyberhub.click/api/inbound` |
-| Check incoming emails for spam | ✅ Enabled |
-| POST the raw, full MIME message | ✅ Enabled |
-
-> **Critical middleware order in `server.js`:** The `/api/inbound` route **must** be registered **before** `express.json()` middleware. If `express.json()` runs first, it consumes the request body before `multer` can parse the multipart form data sent by SendGrid, causing the webhook to silently fail with a 200 OK but no mail delivered.
-
-```javascript
-// CORRECT order in server.js:
-const upload = multer();
-app.post('/api/inbound', upload.any(), handler);  // ← BEFORE express.json()
-app.use(express.json());                           // ← AFTER inbound route
+```bash
+sudo ss -tlnp | grep :25
+# Expected: LISTEN 0 100 0.0.0.0:25
 ```
+
+**Watch inbound delivery in real time:**
+
+```bash
+sudo tail -f /var/log/maillog
+```
+
+> **Note:** The SendGrid Inbound Parse webhook (`/api/inbound`) remains configured as a legacy fallback path but is no longer the primary inbound route.
 
 ---
 
@@ -1184,15 +1371,25 @@ sudo /usr/local/bin/pm2 startup
 
 ### 5.9 SPF / DKIM / DMARC / MTA-STS
 
-**SPF — Hard Fail:**
+**SPF — Soft Fail (includes SendGrid for fallback):**
 
 ```dns
-@ TXT "v=spf1 ip4:54.226.198.180 mx -all"
+@ TXT "v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all"
 ```
 
-`-all` instructs receiving servers to **reject** (not just mark) any message from an unauthorized source.
+`ip4:54.226.198.180` authorizes direct sending from the EC2 server. `include:sendgrid.net` authorizes SendGrid when the fallback relay activates. `~all` is a soft fail — stricter than nothing but allows DMARC to make the final enforcement decision via `p=reject`.
 
-**DKIM — CNAME delegation to SendGrid:**
+**DKIM — Two signing paths:**
+
+*Local signing via OpenDKIM (direct send — primary):*
+
+```dns
+mail._domainkey  TXT  "v=DKIM1; k=rsa; p=<public key>"
+```
+
+OpenDKIM signs every outbound message before it leaves Postfix, using selector `mail`. This is what allows direct SMTP delivery to pass DMARC without going through SendGrid.
+
+*CNAME delegation to SendGrid (fallback relay):*
 
 ```dns
 s1._domainkey  CNAME  s1.domainkey.u61568083.wl084.sendgrid.net
@@ -1200,7 +1397,7 @@ s2._domainkey  CNAME  s2.domainkey.u61568083.wl084.sendgrid.net
 em5287         CNAME  u61568083.wl084.sendgrid.net
 ```
 
-CNAME-based DKIM allows SendGrid to rotate 2048-bit RSA keys automatically without requiring manual DNS updates.
+CNAME-based DKIM allows SendGrid to rotate 2048-bit RSA keys automatically without requiring manual DNS updates. These selectors are only used when the `fallback_relay` activates.
 
 **DMARC — Strict reject policy:**
 
@@ -1219,11 +1416,59 @@ _dmarc TXT "v=DMARC1; p=reject; rua=mailto:admin@gwallofchina.yulcyberhub.click;
 **MTA-STS & TLS-RPT:**
 
 ```dns
-_mta-sts  TXT  "v=STSv1; id=20240101000000"
+_mta-sts  TXT  "v=STSv1; id=20260403000000"
 _smtp._tls TXT  "v=TLSRPTv1; rua=mailto:admin@gwallofchina.yulcyberhub.click"
 ```
 
 MTA-STS prevents SMTP MitM downgrade attacks by requiring TLS with a valid certificate. TLS-RPT reports any encryption failures or downgrade attempts.
+
+**MTA-STS policy file** — served at `https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt`:
+
+```
+version: STSv1
+mode: enforce
+mx: mail.gwallofchina.yulcyberhub.click
+max_age: 86400
+```
+
+**Nginx virtual host** (`/etc/nginx/conf.d/mta-sts.conf`):
+
+```nginx
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mta-sts.gwallofchina.yulcyberhub.click;
+    return 301 https://$host$request_uri;
+}
+
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name mta-sts.gwallofchina.yulcyberhub.click;
+
+    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+
+    root /var/www/mta-sts;
+
+    location = /.well-known/mta-sts.txt {
+        default_type text/plain;
+        try_files $uri =404;
+    }
+
+    location / {
+        return 404;
+    }
+}
+```
+
+**Verify:**
+
+```bash
+curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
+```
 
 ---
 
@@ -1304,16 +1549,17 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 | List mailboxes | `sudo cat /etc/postfix/vmailbox` |
 | List Dovecot users | `sudo cat /etc/dovecot/users` |
 | Check mail folders | `sudo ls /var/mail/vhosts/gwallofchina.yulcyberhub.click/` |
+| Verify relay config | `postconf relayhost fallback_relay` |
 
 **End-to-End Mail Delivery:**
 
 ![AEC Final Audit Email](images/image1.png)
-*Gmail inbox — "AEC Final Audit" received from `admin@gwallofchina.yulcyberhub.click`. Confirms the full SendGrid relay chain is operational and the domain identity is trusted by Google's mail infrastructure.*
+*Gmail inbox — "AEC Final Audit" received from `admin@gwallofchina.yulcyberhub.click`. Confirms end-to-end mail delivery is operational and the domain identity is trusted by Google's mail infrastructure.*
 
 ![Local Mail Delivery](images/image5.png)
 *Local delivery test: three messages in `/var/spool/mail/root`, `From: Cloud User <rocky@mail.gwallofchina.yulcyberhub.click>`. Postfix local transport confirmed.*
 
-** Receving Mail Via Webmail App**
+**Receiving Mail Via Webmail App**
 ![Local Mail Delivery](images/receiving_email_app.png)
 
 **SSL Labs A+ — Mail Server:**
@@ -1379,6 +1625,16 @@ Included specifically for the ARM64 Graviton2 processor — on hardware without 
 | Permission denied writing mail | PM2 running as `rocky` user, not root | Switched to `sudo /usr/local/bin/pm2` |
 | Dovecot permission denied on `/var/mail` | `/var/mail` set to 700 | `chmod 755 /var/mail && chmod 755 /var/mail/vhosts` |
 | `mydestination` + `virtual_mailbox_domains` conflict | Domain listed in both directives | Removed `$mydomain` from `mydestination` |
+| Direct send rejected by Gmail (`5.7.26 DMARC`) | Mail sent without DKIM signature — SendGrid DKIM only covers SendGrid-relayed mail | Installed OpenDKIM milter for local signing |
+| OpenDKIM exit code 78 on startup | `TrustAnchorFile` path does not exist on Rocky Linux 10 | Removed `TrustAnchorFile` line from `opendkim.conf` |
+| `signing table references unknown key` | KeyTable file was empty — `tee` wrote entry to SigningTable instead | Rewrote both SigningTable and KeyTable with correct single-line entries |
+| `multiple DNS replies` for DKIM key | DNS record stored as 3 separate ResourceRecords instead of one value with quoted chunks | Deleted and recreated record as single value with space-separated quoted chunks |
+| `CharacterStringTooLong` when adding DKIM TXT | Full key exceeds 255-char DNS TXT string limit | Split key into multiple quoted chunks within a single ResourceRecord value |
+| SPF fail on direct-sent mail | Two conflicting SPF records (`v=spf1 -all` and correct record) | Deleted `v=spf1 -all` record; kept `v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all` |
+| Port 465 (SMTPS) not listening | `smtps` service missing from `master.cf` | Added `smtps inet n - n - - smtpd` block with `-o smtpd_tls_wrappermode=yes` |
+| `master.cf` sed corrupted submission block | `sed -i` merged multi-line block into one line | Rewrote `master.cf` manually with correct indentation for each `-o` option |
+| MTA-STS policy file missing | Policy file not created on server | Created `/var/www/mta-sts/.well-known/mta-sts.txt` and added Nginx virtual host |
+| MTA-STS subdomain no certificate | `mta-sts.gwallofchina.yulcyberhub.click` not in SAN cert | Expanded cert with `certbot --expand -d mta-sts.gwallofchina.yulcyberhub.click` |
 
 **Full validation command set:**
 
@@ -1420,6 +1676,30 @@ sudo doveadm auth test sroy@gwallofchina.yulcyberhub.click 'password'
 
 # 11. Check webmail process
 sudo /usr/local/bin/pm2 list
+
+# 12. Verify outbound relay configuration
+postconf relayhost fallback_relay
+# Expected: relayhost = (empty)   fallback_relay = [smtp.sendgrid.net]:587
+
+# 13. Verify OpenDKIM is running and wired to Postfix
+sudo systemctl status opendkim
+ss -tlnp | grep 8891
+postconf smtpd_milters non_smtpd_milters
+
+# 14. Verify DKIM key in DNS
+sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
+# Expected: key OK
+
+# 15. Full auth verification (port25 auto-reply)
+echo "auth test" | mail -s "auth test" check-auth@verifier.port25.com
+# Check reply at https://mail.gwallofchina.yulcyberhub.click for SPF/DKIM/DMARC results
+
+# 16. MTA-STS policy file
+curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
+
+# 17. All ports listening
+sudo ss -tlnp | grep -E ':(25|465|587|993)'
+# Expected: all four ports listening
 ```
 
 **Final SSL Labs Summary:**
@@ -1433,14 +1713,24 @@ sudo /usr/local/bin/pm2 list
 
 | Component | Status |
 |---|---|
-| Outbound mail (SendGrid relay) | ✅ Working |
-| Inbound mail (SendGrid Parse webhook) | ✅ Working |
+| Outbound mail — direct SMTP (primary) | ✅ Working (`relayhost =` empty · OpenDKIM signs · port 25 open) |
+| Outbound mail — SendGrid relay (fallback) | ✅ Configured (`fallback_relay = [smtp.sendgrid.net]:587`) |
+| Inbound mail — direct SMTP (port 25) | ✅ Working (MX → `mail.gwallofchina.yulcyberhub.click:25`) |
+| OpenDKIM local DKIM signing | ✅ Active (`s=mail` · `DKIM-Signature field added` confirmed in logs) |
+| SPF | ✅ Pass (`ip4:54.226.198.180 include:sendgrid.net mx ~all`) |
+| DKIM | ✅ Pass (direct: OpenDKIM `mail._domainkey` · fallback: SendGrid `s1/s2._domainkey`) |
+| DMARC | ✅ Pass (`p=reject` · both paths satisfy alignment) |
+| MTA-STS | ✅ Policy file live at `https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt` |
+| Port 25 (SMTP) | ✅ Listening — inbound + outbound |
+| Port 465 (SMTPS) | ✅ Listening — implicit TLS |
+| Port 587 (Submission) | ✅ Listening — STARTTLS |
+| Port 993 (IMAPS) | ✅ Listening — implicit TLS |
 | Dovecot IMAP | ✅ Working |
 | Webmail app | ✅ Live at `https://mail.gwallofchina.yulcyberhub.click` |
-| SSL certificate | ✅ Valid until 2026-06-30 |
+| SSL certificate | ✅ Valid until 2026-07-02 (SAN: main + mail + mta-sts) |
 | Main website | ✅ Live at `https://gwallofchina.yulcyberhub.click` |
 | User mailboxes | ✅ pborelli, kbain, molivier, sroy |
-| DNSSEC | ✅ Fully validated (chain established) |
+| DNSSEC | ✅ Fully validated (chain established · `ad` flag confirmed) |
 
 ---
 
@@ -1477,6 +1767,9 @@ sudo /usr/local/bin/pm2 list
 | [27] | PM2 | PM2 Process Manager Documentation | Docs | 2024 | https://pm2.keystone.io/docs/ |
 | [28] | Twilio SendGrid | Inbound Parse Webhook | Docs | 2024 | https://docs.sendgrid.com/for-developers/parsing-email/inbound-email |
 | [29] | W. Venema | Postfix Virtual Mailbox Hosting | Docs | 2024 | https://www.postfix.org/VIRTUAL_README.html |
+| [30] | The OpenDKIM Project | OpenDKIM Documentation | Docs | 2024 | http://www.opendkim.org/docs.html |
+| [31] | The OpenDKIM Project | opendkim.conf(5) man page | Docs | 2024 | http://www.opendkim.org/opendkim.conf.5.html |
+| [32] | IETF | MTA-STS Policy File Specification — RFC 8461 | RFC | 2018 | https://datatracker.ietf.org/doc/html/rfc8461 |
 
 ---
 
@@ -1493,6 +1786,3 @@ sudo /usr/local/bin/pm2 list
 ![Screenshots](https://img.shields.io/badge/Screenshots-60%20embedded-lightgrey?style=flat-square)
 
 *"Security is not a product, but a process."* — Bruce Schneier
-
-
-
