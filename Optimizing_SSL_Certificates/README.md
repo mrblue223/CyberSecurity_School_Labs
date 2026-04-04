@@ -1164,7 +1164,6 @@ sudo certbot certonly \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
   --agree-tos --no-eff-email \
-  -m sroy@gwallofchina.yulcyberhub.click \
   --dry-run
 ```
 
