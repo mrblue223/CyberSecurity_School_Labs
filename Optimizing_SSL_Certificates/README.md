@@ -1454,6 +1454,7 @@ Authentication-Results: mx.google.com;
 | [28] | MXToolbox | Email Header Analyzer | Tool | 2024 | https://mxtoolbox.com/EmailHeaders.aspx |
 | [29] | Port25 Solutions | Email Verifier (check-auth) | Tool | 2024 | https://www.port25.com/authentication-checker/ |
 | [30] | dmarcian | DMARC Inspector | Tool | 2024 | https://dmarcian.com/dmarc-inspector/ |
+| [31] | redsift | Email Tester | Tool | 2026 | https://redsift.com/tools/investigate |
 
 ---
 
