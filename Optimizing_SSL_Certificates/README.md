@@ -1502,6 +1502,9 @@ echo "user@gwallofchina.yulcyberhub.click:{SHA512-CRYPT}HASH:5000:5000::/var/mai
 
 # 6. Reload services
 sudo systemctl reload postfix dovecot
+
+# 7 Automation (can be found in scripts)
+sudo ./mail-admin.sh add <user>
 ```
 
 ---
