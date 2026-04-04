@@ -50,7 +50,7 @@
   - [4.4 Perfect Forward Secrecy (PFS)](#44-perfect-forward-secrecy-pfs)
   - [4.5 HTTP Strict Transport Security (HSTS) & Security Headers](#45-http-strict-transport-security-hsts--security-headers)
   - [4.6 Service Hardening](#46-service-hardening)
-  - [4.7 Final Configurations]()
+  - [4.7 Final Configurations](https://github.com/mrblue223/CyberSecurity_School_Labs/blob/main/Optimizing_SSL_Certificates/README.md#47-final-configurations)
   - [4.8 Verification](#47-verification)
 - [Phase 5 — Mail Server Hardening (Postfix & Dovecot)](#phase-5--mail-server-hardening-postfix--dovecot)
   - [5.1 SSL Certificate Choice](#51-ssl-certificate-choice)
