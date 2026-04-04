@@ -819,7 +819,7 @@ server {
 
 ---
 
-### 4.7
+### 4.7 Final Configurations
 1. **The global WAF:** nginx.conf
 THe main configuration dosn't just serve files; it acts as a very very lightwheight intrusion detection system (IDS) using nginx map directives.
 - **Bot Mitigation:** The blocked_agent map identifies automated scanners (sqlmap, nikto, burpsuite, etc) and drops the connection before they can even attept to perform information gathering.
