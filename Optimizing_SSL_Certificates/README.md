@@ -1520,7 +1520,7 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 
 ---
 
-### 5.11 Sendgrid fallback mechanisms, Webmail Interactions and final configuration files.
+### 5.12 Sendgrid fallback mechanisms, Webmail Interactions and final configuration files.
 The Postfix configurations are set to act as its own master mailer first. and only uses
 Sendgrid as the fallback if it cannot rech the destinattion
     
@@ -1640,11 +1640,116 @@ alias_maps = lmdb:/etc/aliases
 alias_database = lmdb:/etc/aliases
 
 ```
+2. **The Delivery Instructions:** /etc/postfix/master.cf
+This file manages how different services (SMTP, Submission, SMTPS) behaves.
+- **Key Sections to Verify:**
+    - **Submission (587): Must have smtpd_sasl_auth_enable=yes so the webmail can send mail.
+    - **Custom Transports:** Ensure the direct-smtp and sendgrid transports are defined at the bottom for the rate-limiting required by AWS.
 
+```properties
+#
+# Postfix master process configuration file.  For details on the format
+# of the file, see the master(5) manual page (command: "man 5 master" or
+# on-line: http://www.postfix.org/master.5.html).
+#
+# Do not forget to execute "postfix reload" after editing this file.
+#
+# ==========================================================================
+# service type  private unpriv  chroot  wakeup  maxproc command + args
+#               (yes)   (yes)   (no)    (never) (100)
+# ==========================================================================
+smtp      inet  n       -       n       -       -       smtpd
+#smtp      inet  n       -       n       -       1       postscreen
+#smtpd     pass  -       -       n       -       -       smtpd
+#dnsblog   unix  -       -       n       -       0       dnsblog
+#tlsproxy  unix  -       -       n       -       0       tlsproxy
+
+# Submission port 587 — authenticated relay (clients sending outbound mail)
+submission inet n       -       n       -       -       smtpd
+  -o syslog_name=postfix/submission
+  -o smtpd_tls_security_level=encrypt
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_tls_auth_only=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+
+# SMTPS port 465 — implicit TLS (no STARTTLS downgrade possible)
+smtps     inet  n       -       n       -       -       smtpd
+  -o syslog_name=postfix/smtps
+  -o smtpd_tls_wrappermode=yes
+  -o smtpd_sasl_auth_enable=yes
+  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
+
+#628       inet  n       -       n       -       -       qmqpd
+pickup    unix  n       -       n       60      1       pickup
+cleanup   unix  n       -       n       -       0       cleanup
+qmgr      unix  n       -       n       300     1       qmgr
+#qmgr     unix  n       -       n       300     1       oqmgr
+tlsmgr    unix  -       -       n       1000?   1       tlsmgr
+rewrite   unix  -       -       n       -       -       trivial-rewrite
+bounce    unix  -       -       n       -       0       bounce
+defer     unix  -       -       n       -       0       bounce
+trace     unix  -       -       n       -       0       bounce
+verify    unix  -       -       n       -       1       verify
+flush     unix  n       -       n       1000?   0       flush
+proxymap  unix  -       -       n       -       -       proxymap
+proxywrite unix -       -       n       -       1       proxymap
+smtp      unix  -       -       n       -       -       smtp
+relay     unix  -       -       n       -       -       smtp
+        -o syslog_name=postfix/$service_name
+#       -o smtp_helo_timeout=5 -o smtp_connect_timeout=5
+showq     unix  n       -       n       -       -       showq
+error     unix  -       -       n       -       -       error
+retry     unix  -       -       n       -       -       error
+discard   unix  -       -       n       -       -       discard
+local     unix  -       n       n       -       -       local
+virtual   unix  -       n       n       -       -       virtual
+lmtp      unix  -       -       n       -       -       lmtp
+anvil     unix  -       -       n       -       1       anvil
+scache    unix  -       -       n       -       1       scache
+postlog   unix-dgram n  -       n       -       1       postlogd
+
+# ====================================================================
+# Custom transports — Direct sending + SendGrid relay
+# Rate limited to 1 email/min each
+# ====================================================================
+
+direct-smtp  unix  -  -  n  -  1  smtp
+    -o smtp_destination_rate_delay=60s
+    -o smtp_destination_concurrency_limit=1
+    -o smtp_extra_recipient_limit=1
+
+sendgrid     unix  -  -  n  -  1  smtp
+    -o smtp_destination_rate_delay=60s
+    -o smtp_destination_concurrency_limit=1
+    -o smtp_extra_recipient_limit=1
+    -o smtp_sasl_auth_enable=yes
+    -o relayhost=[smtp.sendgrid.net]:587
+    -o smtp_sasl_password_maps=lmdb:/etc/postfix/sasl_passwd
+    -o smtp_sasl_security_options=noanonymous
+
+```
+3. **The Secret Vault:** /etc/postfix/sasl_passwd
+This file contains the "handshake" credentials for SendGrid.
+- **Action Required:**
+    - Must contain: [smtp.sendgrid.net]:587 apikey:SG.<REDACTED>
+    - **CRITICAL:** Must be compiled into LMDB format using: sudo postmap lmdv:/etc/postfix/sasl_passwd, every time the API key changes.
+    - Because of the information disclosure risk i will not be including the file.
+ 
+4. **THe User Database:** /etc/dovecot/users
+This is the file the script mail-admin.sh manages, notes the permisisons and the setup these are virtual users.
+- **Format Check:**
+    - Each line must follow the user@domain:{HASH}:5000:5000::/path format.
+    - **Security:** Ensure it uses  {SHA512-CRYPT} to maintain the A+ security rathing.
+
+5. **The Auth Bridge:** /etc/dovecot/conf.d/auth-passwdfile.conf.ext
+This file tells the Dovecot service how to read the users file mentioned above.
+- **Configuration Check:**
+    - passdb and userdb sections must both point to args = etc/dovecot/users.
+    - Without this file being correctly configured and included in 10-auth.conf, Dovecot won't know where to look for the users you add with the script.
 
 ---
 
-### 5.12 Verification
+### 5.13 Verification
 
 **IMAPS (Port 993):**
 
