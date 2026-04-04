@@ -449,8 +449,7 @@ sudo certbot certonly \
   -d gwallofchina.yulcyberhub.click \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
-  --agree-tos --no-eff-email \
-  -m sroy@gwallofchina.yulcyberhub.click
+  --agree-tos --no-eff-email 
 ```
 
 | Property | Value |
@@ -1083,9 +1082,7 @@ sudo certbot certonly \
   -d gwallofchina.yulcyberhub.click \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
-  --agree-tos --no-eff-email \
-  -m sroy@gwallofchina.yulcyberhub.click \
-  --dry-run
+  --agree-tos --no-eff-email \ --dry-run
 
 # If dry-run passes, reissue for real
 sudo certbot delete --cert-name gwallofchina.yulcyberhub.click
@@ -1096,8 +1093,7 @@ sudo certbot certonly \
   -d gwallofchina.yulcyberhub.click \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
-  --agree-tos --no-eff-email \
-  -m sroy@gwallofchina.yulcyberhub.click
+  --agree-tos --no-eff-email 
 
 sudo systemctl reload nginx postfix dovecot
 ```
