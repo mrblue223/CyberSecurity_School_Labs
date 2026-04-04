@@ -819,7 +819,200 @@ server {
 
 ---
 
-### 4.7 Verification
+### 4.7
+1. **The global WAF:** nginx.conf
+THe main configuration dosn't just serve files; it acts as a very very lightwheight intrusion detection system (IDS) using nginx map directives.
+- **Bot Mitigation:** The blocked_agent map identifies automated scanners (sqlmap, nikto, burpsuite, etc) and drops the connection before they can even attept to perform information gathering.
+- **URI Filtering:** The blcoked_uri map provides a "ligh WAF" by blocking common attack patterns like path traversal (../), SQL injection (union select), and remote code execution (/bin/bash).
+- **Rate limit Zones:** We pre-defined zones for global, login, and api, This allows us to apply different "speed limits" to different parts of the apps.
+
+2. **The Gateay:** gwallofchina.conf
+This file handles the primary domain and enforces the **A+ Security rating** standards.
+- **HSTS Enforcement:** add header Strict-Transport-Securityy "max-age=63072000;..." tells browsers to cach the HTTPS requriement for 2 years.
+- **Logjam Protection:** ssl_dhparam /etc/nginx/ssl/dhparam.pem uses a custom 4096-bit primes, moviging us beyond the standard (and potentially vulnerable) 2048-bit defaults.
+- **OCSP Stapling:** This improves performance and privacy by providing the "the certificate is valid" proof directly from our server, so the client's browser dosn't have o query the CA.
+
+```properties
+# --- Global Rate Limiting Zone ---
+# Define the memory zone (10m) and the rate (10 requests per second per IP)
+limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
+
+# --- HTTP (Port 80) - Force Redirect to HTTPS ---
+server {
+    if ($host = gwallofchina.yulcyberhub.click) {
+        return 301 https://$host$request_uri;
+    } # managed by Certbot
+
+
+    listen 80;
+    listen [::]:80;
+    server_name gwallofchina.yulcyberhub.click;
+
+    # 301 Redirect ensures all unencrypted traffic is moved to Port 443
+    return 301 https://$host$request_uri;
+
+
+}
+
+# --- HTTPS (Port 443) - Secure Environment ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on; 
+
+    server_name gwallofchina.yulcyberhub.click;
+
+    # SSL Certificate Paths (Let's Encrypt)
+    ssl_certificate /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem; # managed by Certbot
+
+    # Protocol & Cipher Hardening
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # High-Entropy Ciphers (Prioritizing AEAD)
+    ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
+
+    # Custom 4096-bit DH Parameters (Mitigates Logjam)
+    ssl_dhparam /etc/nginx/ssl/dhparam.pem;
+
+    # --- OCSP Stapling (Performance & Privacy) ---
+    ssl_stapling on;
+    ssl_stapling_verify on;
+    resolver 8.8.8.8 8.8.4.4 valid=300s;
+    resolver_timeout 5s;
+
+    # --- SECURITY HEADERS (The 'A+' Requirements) ---
+
+    # HSTS: Forces browser-side HTTPS enforcement for 2 years
+    add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
+
+    # Anti-Clickjacking & XSS Protection
+    add_header X-Frame-Options "SAMEORIGIN" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header X-Content-Type-Options "nosniff" always;
+
+    # Modern Privacy & Referrer Controls
+    add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+    add_header X-Permitted-Cross-Domain-Policies "none" always;
+
+    # Content Security Policy (Hardened)
+    add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; upgrade-insecure-requests;" always;
+
+    # Permissions Policy (Restricts hardware access)
+    add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()" always;
+
+    # Cross-Origin Isolation (Mitigates Spectre-like attacks)
+    add_header Cross-Origin-Opener-Policy "same-origin" always;
+    add_header Cross-Origin-Embedder-Policy "require-corp" always;
+    add_header Cross-Origin-Resource-Policy "same-origin" always;
+
+    # --- END SECURITY HEADERS ---
+
+    # Document Root and Index
+    root /var/www/html;
+    index index.html;
+
+    # Logging
+    access_log /var/log/nginx/gwallofchina.access.log;
+    error_log /var/log/nginx/gwallofchina.error.log;
+
+    location / {
+        # Apply the Rate Limit: Allows bursts of 20 but keeps steady 10r/s
+        limit_req zone=mylimit burst=20 nodelay;
+        
+        try_files $uri $uri/ =404;
+    }
+
+}
+
+```
+
+
+3. **The Webmail Bridge:** webmail.conf
+This is the most critical file for the user experience. it acts as a reverse proxy between the internet and the Node.js app running on port 3000.
+- **Targeted Rate limiting
+```nginx
+location /api/login {
+limit_req zone=webmail_limit burst=5 nodelay;
+}
+
+This specifically targets the login endpoint. Even if a bot manages to bypass the User-Agent check, it is limited to **5 attempts per minute**, making brute-force attacks mathematically unfeasible.
+```
+- **Header Passing:** The proxy_set_header directives (like X-Forwarded-For) ensures that the Node.js app knows the **real IP** of the visitor, which is essential for acurate logging and security auditing within the app itself**
+
+```properties
+# Rate limiting zone
+limit_req_zone $binary_remote_addr zone=webmail_limit:10m rate=5r/m;
+
+# HTTP → HTTPS redirect
+server {
+    listen 80;
+    listen [::]:80;
+    server_name mail.gwallofchina.yulcyberhub.click;
+    return 301 https://$host$request_uri;
+}
+
+# HTTPS → Node app
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+    server_name mail.gwallofchina.yulcyberhub.click;
+
+    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem; # managed by Certbot
+    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;  # managed by Certbot
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_prefer_server_ciphers on;
+    ssl_session_cache shared:SSL:10m;
+    ssl_session_timeout 1d;
+    ssl_session_tickets off;
+
+    # Security headers
+    add_header Strict-Transport-Security "max-age=63072000" always;
+    add_header X-Frame-Options "DENY" always;
+    add_header X-Content-Type-Options "nosniff" always;
+    add_header X-XSS-Protection "1; mode=block" always;
+    add_header Referrer-Policy "no-referrer" always;
+
+    # Logging
+    access_log /var/log/nginx/webmail.access.log;
+    error_log  /var/log/nginx/webmail.error.log;
+
+    # Rate limit login endpoint
+    location /api/login {
+        limit_req zone=webmail_limit burst=5 nodelay;
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host            $host;
+        proxy_set_header   X-Real-IP       $remote_addr;
+        proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
+    }
+
+    # All other traffic
+    location / {
+        proxy_pass         http://127.0.0.1:3000;
+        proxy_http_version 1.1;
+        proxy_set_header   Host              $host;
+        proxy_set_header   X-Real-IP         $remote_addr;
+        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
+        proxy_set_header   Upgrade           $http_upgrade;
+        proxy_set_header   Connection        'upgrade';
+    }
+}
+
+```
+
+
+
+
+---
+
+### 4.8 Verification
 
 ![Nginx Verify Script](images/image2.png)
 *`nginx_verify3.0.sh` automated output — all checks passed: TLS 1.2 ✅, TLS 1.3 ✅, TLS 1.1 correctly rejected ✅, TLS 1.0 correctly rejected ✅, HTTP/2 active ✅, HTTP redirect 301 ✅, HTTPS 200 OK ✅, all 11 security headers present ✅, server version not disclosed ✅.*
