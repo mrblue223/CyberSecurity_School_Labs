@@ -1031,7 +1031,26 @@ userdb {
 }
 ```
 
-### 5.13 Verification
+---
+
+### 5.13 SSL Labs Webserver Server Rating
+
+**Test:** https://www.ssllabs.com/ssltest/analyze.html?d=gwallofchina.yulc>
+
+| Field | Result |
+|---|---|
+| Overall rating | _(fill in — expected: A+)_ |
+| Certificate score | _(fill in — expected: 100)_ |
+| Protocol score | _(fill in — expected: 100)_ |
+| Key exchange score | _(fill in — expected: ~90)_ |
+| Cipher strength score | _(fill in — expected: ~90)_ |
+| TLS 1.3 supported | _[ ]_ Yes / _[ ]_ No |
+| HSTS header present | _[ ]_ Yes / _[ ]_ No |
+| Test date | _(fill in)_ |
+
+---
+
+### 5.14 Verification
 
 ```bash
 sudo ss -tulpn | grep -E ':(25|465|587|993)'
