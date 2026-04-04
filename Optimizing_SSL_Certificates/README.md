@@ -64,7 +64,7 @@
   - [5.9 SPF / DKIM / DMARC / MTA-STS](#59-spf--dkim--dmarc--mta-sts)
   - [5.10 Adding a New User](#510-adding-a-new-user)
   - [5.11 Client Mail App Settings](#511-client-mail-app-settings)
-  - [5.12 Sendgrid Fallback, webmail, final configurations](#512-sendgrid-fallback-mechnisms-webmail-interactions-and-final-configuration-files)
+  - [5.12 Sendgrid Fallback, webmail, final configurations](https://github.com/mrblue223/CyberSecurity_School_Labs/blob/main/Optimizing_SSL_Certificates/README.md#512-sendgrid-fallback-mechanisms-webmail-interactions-and-final-configuration-files)
   - [5.13 Verification](#512-verification)
 - [Phase 6 — Challenges & Trade-Offs](#phase-6--challenges--trade-offs)
   - [6.1 Security vs. Compatibility](#61-security-vs-compatibility)
