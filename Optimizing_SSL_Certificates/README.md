@@ -57,7 +57,7 @@
    - [5.10 Adding a New User](#510-adding-a-new-user)
    - [5.11 Client Mail App Settings](#511-client-mail-app-settings)
    - [5.12 SendGrid Fallback, Webmail Interactions, and Final Configuration Files](#512-sendgrid-fallback-webmail-interactions-and-final-configuration-files)
-   - [5.13 SSL Labs Webserver Rating]()
+   - [5.13 SSL Labs Webserver Rating](https://github.com/mrblue223/CyberSecurity_School_Labs/blob/main/Optimizing_SSL_Certificates/README.md#513-ssl-labs-webserver-server-rating)
    - [5.14 Verification](#514-verification)
 8. [Phase 6 — Certificate Renewal: DNS-01 via Route 53](#8-phase-6--certificate-renewal-dns-01-via-route-53)
    - [6.1 Why DNS-01 Only — No Port 80 Dependency](#61-why-dns-01-only--no-port-80-dependency)
