@@ -1,21 +1,11 @@
-# 🔐 Optimizing SSL/TLS Certificates for Nginx & Postfix
+# Optimizing SSL/TLS Certificates for Nginx & Postfix
 
-> **Author:** Sammy Roy · **Cohort:** MEQ7 · **Team:** Team 3  
+> **Author:** Sammy Roy · **Cohort:** MEQ7 · **Team:** Team 3
 > **Domain:** `gwallofchina.yulcyberhub.click` · **Due:** April 2, 2026
-
-![SSL Labs](https://img.shields.io/badge/SSL_Labs-A%2B-44bb00?style=flat&logo=letsencrypt)
-![TLS](https://img.shields.io/badge/TLS-1.3-007acc?style=flat&logo=openssl)
-![Let's Encrypt](https://img.shields.io/badge/Certificate-Let's_Encrypt-ff8c00?style=flat&logo=letsencrypt)
-![AWS](https://img.shields.io/badge/DNS-AWS_Route_53-232F3E?style=flat&logo=amazon-aws)
-![Rocky Linux](https://img.shields.io/badge/OS-Rocky_Linux-10B981?style=flat&logo=rockylinux)
-![DNSSEC](https://img.shields.io/badge/DNSSEC-Chain_Established-6a32b9?style=flat)
-![DMARC](https://img.shields.io/badge/DMARC-p%3Dreject-d32f2f?style=flat)
-![OpenDKIM](https://img.shields.io/badge/DKIM-OpenDKIM%20Local%20Signing-0066cc?style=flat)
-![Classification](https://img.shields.io/badge/Classification-Internal_Technical_Doc-555555?style=flat)
 
 ---
 
-## 👥 Team Contributions
+## Team Contributions
 
 | Team Member | Role | Key Contributions |
 |---|---|---|
@@ -26,51 +16,16 @@
 
 ---
 
-## 📋 Table of Contents
+## Table of Contents
 
 - [Executive Summary](#executive-summary)
 - [Architecture Overview](#architecture-overview)
 - [Phase 1 — AWS CLI & Credential Security](#phase-1--aws-cli--credential-security)
-  - [1.1 Threat Model](#11-threat-model)
-  - [1.2 Secure Alternatives: SSO vs. aws-vault](#12-secure-alternatives-sso-vs-aws-vault)
-  - [1.3 aws-vault — Encrypted Keyring Credentials](#13-aws-vault--encrypted-keyring-credentials)
-  - [1.4 AWS SSO — Non-Persistent Sessions (Step-by-Step)](#14-aws-sso--non-persistent-sessions-step-by-step)
 - [Phase 2 — DNS Infrastructure](#phase-2--dns-infrastructure)
-  - [2.1 Creating the Hosted Zone](#21-creating-the-hosted-zone)
-  - [2.2 DNS Record Architecture](#22-dns-record-architecture)
-  - [2.3 DNSSEC Implementation](#23-dnssec-implementation)
 - [Phase 3 — EC2 Instance & Security Groups](#phase-3--ec2-instance--security-groups)
-  - [3.1 Instance Launch Script](#31-instance-launch-script)
-  - [3.2 Deployed Instance Configuration](#32-deployed-instance-configuration)
-  - [3.3 Security Group Rules](#33-security-group-rules)
 - [Phase 4 — Nginx Web Server Hardening](#phase-4--nginx-web-server-hardening)
-  - [4.1 SSL Certificate Choice](#41-ssl-certificate-choice)
-  - [4.2 Protocol Selection](#42-protocol-selection)
-  - [4.3 Cipher Suites](#43-cipher-suites)
-  - [4.4 Perfect Forward Secrecy (PFS)](#44-perfect-forward-secrecy-pfs)
-  - [4.5 HTTP Strict Transport Security (HSTS) & Security Headers](#45-http-strict-transport-security-hsts--security-headers)
-  - [4.6 Service Hardening](#46-service-hardening)
-  - [4.7 Final Configurations](https://github.com/mrblue223/CyberSecurity_School_Labs/blob/main/Optimizing_SSL_Certificates/README.md#47-final-configurations)
-  - [4.8 Verification](#47-verification)
 - [Phase 5 — Mail Server Hardening (Postfix & Dovecot)](#phase-5--mail-server-hardening-postfix--dovecot)
-  - [5.1 SSL Certificate Choice](#51-ssl-certificate-choice)
-  - [5.2 Installation](#52-installation)
-  - [5.3 Protocol Selection](#53-protocol-selection)
-  - [5.4 Cipher Suites & Inbound TLS Hardening](#54-cipher-suites--inbound-tls-hardening)
-  - [5.5 SMTP Authentication — The Secret Pipe](#55-smtp-authentication--the-secret-pipe)
-  - [5.5.1 OpenDKIM — Local DKIM Signing](#551-opendkim--local-dkim-signing)
-  - [5.6 Virtual Mailbox Configuration](#56-virtual-mailbox-configuration)
-  - [5.7 Inbound Mail — Direct SMTP Reception](#57-inbound-mail--direct-smtp-reception)
-  - [5.8 Webmail Application](#58-webmail-application)
-  - [5.9 SPF / DKIM / DMARC / MTA-STS](#59-spf--dkim--dmarc--mta-sts)
-  - [5.10 Adding a New User](#510-adding-a-new-user)
-  - [5.11 Client Mail App Settings](#511-client-mail-app-settings)
-  - [5.12 Sendgrid Fallback, webmail, final configurations](https://github.com/mrblue223/CyberSecurity_School_Labs/blob/main/Optimizing_SSL_Certificates/README.md#512-sendgrid-fallback-mechanisms-webmail-interactions-and-final-configuration-files)
-  - [5.13 Verification](#512-verification)
 - [Phase 6 — Challenges & Trade-Offs](#phase-6--challenges--trade-offs)
-  - [6.1 Security vs. Compatibility](#61-security-vs-compatibility)
-  - [6.2 Performance Considerations](#62-performance-considerations)
-  - [6.3 Testing & Troubleshooting](#63-testing--troubleshooting)
 - [References](#references)
 
 ---
@@ -81,15 +36,12 @@ This document is a comprehensive technical reflection on the **"Great Wall"** ha
 
 | Component | Rating | Key Achievement |
 |---|---|---|
-| Web Server (Nginx) | ![A+](https://img.shields.io/badge/-A%2B-brightgreen) | TLS 1.3 · HSTS Preload · OCSP Stapling |
-| Mail Server (Postfix/Dovecot) | ![A+](https://img.shields.io/badge/-A%2B-brightgreen) | SMTPS/IMAPS · SPF/DKIM/DMARC · MTA-STS |
+| Web Server (Nginx) | A+ | TLS 1.3 · HSTS Preload · OCSP Stapling |
+| Mail Server (Postfix/Dovecot) | A+ | SMTPS/IMAPS · SPF/DKIM/DMARC · MTA-STS |
 | Certificate Score | 100/100 | Let's Encrypt SAN cert (ISRG Root X1) |
 | Protocol Score | 100/100 | TLS 1.2 + 1.3 only; all legacy disabled |
 | Key Exchange Score | 100/100 | ECDHE/DHE with 4096-bit DH params |
 | Cipher Strength Score | 100/100 | AEAD-only suites (AES-GCM, ChaCha20) |
-
-![Nginx Landing Page](images/image14.png)
-*The "Great Wall" live Nginx landing page — Team 3, NGINX Division. SSL / TLS · A+ Rated · Secure Connection.*
 
 ---
 
@@ -217,15 +169,6 @@ The CLI opens a browser automatically. The team clicked **Allow access** and sel
 - **Account:** `453875232433` (YulCyberClick Demo)
 - **Role:** `MEQ7_RBAC_Room3`
 
-![AWS SSO Configure](images/image18.png)
-*`aws configure sso` — SSO session name "meq7", region `us-east-1`. The CLI automatically detected the single available account (`YulCyberClick Demo`, 453875232433) and role (`MEQ7_RBAC_Room3`). SSO URL redacted.*
-
-![AWS SSO Access Portal](images/image17.png)
-*AWS Access Portal — `YulCyberClick Demo` account under `MEQ7_RBAC_Room3`. The **"Access keys"** link generates temporary STS credentials on demand — no permanent IAM user keys exist at any point.*
-
-![AWS SSO Login Success](images/image11.png)
-*`aws sso login --profile meq7` — successful browser-based SSO authentication. Profile name and SSO URL redacted for operational security.*
-
 #### Step 4 — Verify the Connection
 
 ```bash
@@ -240,8 +183,7 @@ Expected output — confirms account access without permanent keys:
 }
 ```
 
-![AWS STS Caller Identity](images/image15.png)
-*`aws sts get-caller-identity --profile meq7` — confirms the active session is a temporary STS assumed-role token, not a permanent IAM key. The ARN format `arn:aws:sts::ACCOUNT:assumed-role/...` is the proof — a permanent key would return `arn:aws:iam::ACCOUNT:user/USERNAME`. UserId, Account, and ARN redacted.*
+The ARN format `arn:aws:sts::ACCOUNT:assumed-role/...` confirms a temporary STS assumed-role token, not a permanent IAM key.
 
 #### Daily Usage
 
@@ -278,29 +220,9 @@ aws route53 list-hosted-zones \
 | Domain | `gwallofchina.yulcyberhub.click.` |
 | Type | Public (`PrivateZone: False`) |
 
-![Route 53 Hosted Zone Created](images/image46.png)
-*Green success banner: **"gwallofchina.yulcyberhub.click was successfully created."** The zone starts with 2 records (NS + SOA). The four AWS name servers visible (`ns-144.awsdns-18.com`, `ns-689.awsdns-22.net`, `ns-1306.awsdns-35.org`, `ns-1584.awsdns-06.co.uk`) were handed to the Oracle to complete DNS delegation.*
-
-![Route 53 Hosted Zone Creation Form](images/image9.png)
-*AWS Route 53 "Create hosted zone" form — domain `gwallofchina.yulcyberhub.click`, type: **Public Hosted Zone**, tags: Cohort=MEQ7, Team=Team3.*
-
-![Hosted Zone CLI Verification](images/image16.png)
-*`aws route53 list-hosted-zones` — confirms Zone ID `Z0433076DMIP84BGAZGN`, domain `gwallofchina.yulcyberhub.click.`, `PrivateZone: False` — publicly resolvable on the internet.*
-
----
-
 ### 2.2 DNS Record Architecture
 
 The final hosted zone contains 23 records covering all required services and security mechanisms.
-
-![Route 53 All 18 Records](images/image19.png)
-*AWS Route 53 hosted zone — all 18 DNS records visible: A, AAAA, CAA, MX, NS, SOA, TXT (SPF, DMARC, DKIM, MTA-STS), SRV, and CNAME records.*
-
-![Route_53_all_final_records](images/final_dns_records.png)
-*All records after complete configurations)
-
-![Route 53 Detailed Record Values](images/image35.png)
-*Full record list with values: A (`54.226.198.180`), CAA (`letsencrypt.org` + `amazonaws.com`), MX (`10 mail.*`), NS (four AWS servers), SPF (`v=spf1 ip4:54.226.198.180 mx -all`), DMARC (`p=reject`), DKIM, MTA-STS, `_smtp._tls`, `_visual_hash`, `_autodiscover._tcp` SRV, `mail.` A record, and `www.` CNAME.*
 
 **Foundation Records:**
 
@@ -334,14 +256,7 @@ CAA records restrict certificate issuance to Let's Encrypt only — preventing r
 | `_mta-sts` | TXT | `v=STSv1; id=20260403000000` | SMTP TLS enforcement |
 | `_smtp._tls` | TXT | `v=TLSRPTv1; rua=...` | TLS failure reporting |
 
-> **Critical:** The MX record now points directly to `mail.gwallofchina.yulcyberhub.click` — inbound mail arrives at Postfix on port 25 without any third-party intermediary. **Outbound** mail is signed by OpenDKIM and sent directly via MX lookup. SendGrid acts as outbound fallback only.
-
-The SendGrid DNS records (CNAME-based DKIM) were generated directly from the SendGrid Sender Authentication dashboard:
-
-![SendGrid DKIM Records](images/image34.png)
-*SendGrid Sender Authentication — "Add all of these records to your host's DNS section." Provides the three CNAME records for DKIM (`em5287`, `s1._domainkey`, `s2._domainkey`) and the DMARC TXT record with `p=reject; adkim=s; aspf=s`. These were applied to Route 53 via the AWS CLI.*
-
----
+> **Critical:** The MX record points directly to `mail.gwallofchina.yulcyberhub.click` — inbound mail arrives at Postfix on port 25 without any third-party intermediary. **Outbound** mail is signed by OpenDKIM and sent directly via MX lookup. SendGrid acts as outbound fallback only.
 
 ### 2.3 DNSSEC Implementation
 
@@ -358,69 +273,47 @@ DNSSEC required a hierarchical chain of cryptographic signatures from the root (
 
 Route 53 requires a CMK in AWS KMS to back the Key Signing Key. We created `GWALLkey` tagged with our cohort identifiers:
 
-![AWS KMS CMK Details](images/image32.png)
-*AWS KMS — CMK alias: `GWALLkey`, ARN: `arn:aws:kms:us-east-1:453875232433:key/df174539-4815-420b-a6ce-64052f66d6eb`, Status: **Enabled**, Created: Mar 26 2026 19:54 EDT, Single Region. Tags: Cohort=MEQ7, Team=Room3.*
-
-![AWS KMS Tags Updated](images/image47.png)
-*KMS "Add or edit tags" — green banner: **"Tags updated"**. Tag keys `Cohort = MEQ7` and `Team = Room3` saved. These tags ensure the key is attributable to our cohort for billing and access auditing.*
+- CMK alias: `GWALLkey`
+- ARN: `arn:aws:kms:us-east-1:453875232433:key/df174539-4815-420b-a6ce-64052f66d6eb`
+- Status: Enabled
+- Tags: `Cohort=MEQ7`, `Team=Room3`
 
 **Step 2 — Enable DNSSEC Signing and Create the KSK:**
 
-With the CMK in place, we navigated to Route 53 → DNSSEC signing → Enable. The KSK was named `GWALLkey` and linked to our CMK:
-
-![Route 53 DNSSEC Tab](images/image54.png)
-*Route 53 hosted zone with all 18 records — the **"DNSSEC signing"** tab (highlighted) is where the KSK was created to begin zone signing.*
-
-![DNSSEC KSK Creation Form](images/image28.png)
-*Route 53 "Enable DNSSEC signing" — KSK name: `GWALLkey`, "Create customer managed CMK" selected, alias `GWALLkey`. **"Create KSK and enable signing"** clicked to initiate the process.*
+With the CMK in place, we navigated to Route 53 → DNSSEC signing → Enable. The KSK was named `GWALLkey` and linked to our CMK.
 
 **Step 3 — First Attempt: KMS Permissions Error:**
 
-The first attempt failed because the initial CMK key policy did not grant Route 53 the required actions:
-
-![DNSSEC KMS Permissions Error](images/image38.png)
-*Route 53 error: "The customer managed KMS key does not grant all the required permissions for DNSSEC usage... verify that you and Route 53 have permissions for: `DescribeKey`, `GetPublicKey`, and `Sign`." Resolution: updated the key policy to include `route53.amazonaws.com` as a permitted principal, then re-attempted.*
+The first attempt failed because the initial CMK key policy did not grant Route 53 the required actions: `DescribeKey`, `GetPublicKey`, and `Sign`. Resolution: updated the key policy to include `route53.amazonaws.com` as a permitted principal, then re-attempted.
 
 **Step 4 — Signing Activation:**
 
-After fixing the key policy, Route 53 began signing the zone:
-
-![DNSSEC Signing in Progress](images/image37.png)
-*Blue banner: **"Enabling DNSSEC signing for the hosted zone gwallofchina.yulcyberhub.click. This can take a moment."** The CMK ARN is confirmed. Route 53 generates DNSKEY records and signs all zone records.*
+After fixing the key policy, Route 53 began signing the zone.
 
 **Step 5 — KSK Active, DS Record Ready for Oracle:**
 
-![DNSSEC Signing Successfully Enabled](images/image55.png)
-*Green banner: **"DNSSEC signing was successfully enabled."** DNSSEC signing status: **Signing**. KSK `GWALLkey` — Status: **Active**, created March 26 2026. The **"View information to create DS record"** button (highlighted) provides the DS record hash for the Oracle.*
+DNSSEC signing was successfully enabled. KSK `GWALLkey` — Status: **Active**, created March 26 2026. The DS record hash was provided to the Oracle:
 
-![DNSSEC Signing Active — Full View](images/image56.png)
-*Confirmation view — the "Establish chain of trust for DNSSEC" info box remains until the Oracle completes the DS record delegation. This was the state handed to the instructor.*
-
-![GWALLkey Chain of Trust Details](images/image21.png)
-*GWALLkey details — **DS record provided to Oracle**: `11486 13 2 5D8E98E506AB70F3CF69286813298312235CA86318D376D221D964A26A2B98A7`. Key tag: `11486`, Digest algorithm: SHA-256, Signing algorithm: ECDSAP256SHA256 (type 13). CMK `alias/GWALLkey` status: **Enabled**.*
+```
+DS record: 11486 13 2 5D8E98E506AB70F3CF69286813298312235CA86318D376D221D964A26A2B98A7
+Key tag: 11486
+Digest algorithm: SHA-256
+Signing algorithm: ECDSAP256SHA256 (type 13)
+```
 
 **Step 6 — Oracle Inserts DS Record → Chain Established:**
 
 Once the Oracle inserted the DS record into the `yulcyberhub.click` parent zone, the full chain of trust activated. The `dig` command returned the `ad` (Authenticated Data) flag:
 
-![DNSSEC dig Validation](images/image3.png)
-*`dig +dnssec MX gwallofchina.yulcyberhub.click` — `flags: qr rd ra **ad**`. The `ad` flag confirms DNSSEC is fully validated end-to-end via Cloudflare's 1.1.1.1 resolver. The RRSIG record is visible in the answer section.*
+```bash
+dig +dnssec MX gwallofchina.yulcyberhub.click
+# flags: qr rd ra ad — confirms DNSSEC fully validated end-to-end
 
-`delv` provided independent resolver-level confirmation with an explicit **"fully validated"** verdict:
+delv @1.1.1.1 gwallofchina.yulcyberhub.click
+# ; fully validated
+```
 
-![delv Fully Validated](images/image58.png)
-*`delv @1.1.1.1 gwallofchina.yulcyberhub.click` — `; fully validated`. The A record `54.226.198.180` and its RRSIG (ECDSA P-256, valid until Mar 28 2026) are returned. "Fully validated" is the strongest possible DNSSEC confirmation from a validating resolver.*
-
-DNSViz confirmed all statuses as **Secure** across the complete chain:
-
-![DNSViz Full Secure Status](images/image45.png)
-*DNSViz — **RRset status: Secure (6)**, **DNSKEY/DS/NSEC status: Secure (14)**, **Delegation status: Secure (3)**. All indicators green. Full DNSKEY hierarchy: root → `.click` TLD → `yulcyberhub.click` → our zone.*
-
-![DNSViz Chain — TLD and Parent](images/image13.png)
-*DNSViz upper levels — `.click` TLD and `yulcyberhub.click` parent: DNSKEY and DS records visible. The Oracle's DS record linking to our zone is present and verified.*
-
-![DNSViz Chain — Our Zone](images/image12.png)
-*DNSViz — `gwallofchina.yulcyberhub.click`: DNSKEY records (KSK and ZSK) signing all record types. No broken links, no red warnings.*
+DNSViz confirmed all statuses as **Secure** across the complete chain: RRset status: Secure (6), DNSKEY/DS/NSEC status: Secure (14), Delegation status: Secure (3).
 
 **Key Takeaway:** DNSSEC is a cooperative mechanism. A signed zone without a DS record in the parent is invisible to validating resolvers. The Oracle's action — inserting that single DS record — was the enabling step our team could not perform ourselves.
 
@@ -435,7 +328,7 @@ DNSViz confirmed all statuses as **Secure** across the complete chain:
 
 ### 3.1 Instance Launch Script
 
-Rather than manually clicking through the AWS console, a custom bash script (`launch-instance.sh`) was written to automate EC2 deployment reproducibly. This ensures consistent configuration across deployments and eliminates human error during instance provisioning.
+Rather than manually clicking through the AWS console, a custom bash script (`launch-instance.sh`) was written to automate EC2 deployment reproducibly.
 
 **Instance Parameters:**
 
@@ -499,20 +392,9 @@ chmod 400 thegreatfirewallofchina.pem
 ssh -i thegreatfirewallofchina.pem ec2-user@YOUR_IP
 ```
 
-**Reusing for other labs** — only these four variables need changing:
-
-```bash
-AMI="new-ami"
-INSTANCE_TYPE="t3.medium"
-KEY_NAME="new-key"
-SECURITY_GROUP="sg-new"
-```
-
 > **IMDSv2 enforcement:** The `--metadata-options '{"HttpTokens":"required"}'` flag forces Instance Metadata Service v2, which requires a session token for all metadata requests. This prevents SSRF attacks from reading instance metadata (including IAM role credentials) via a simple HTTP GET — a known attack vector against cloud workloads.
 
 ### 3.2 Deployed Instance Configuration
-
-After running the script, the resulting instance was verified:
 
 | Field | Value |
 |---|---|
@@ -545,12 +427,6 @@ The instance is attached to a **single** security group — no additional groups
 
 > **Note on port 25:** Port 25 is open in the security group and unblocked at the AWS account level (actioned by Oracle/instructor). Postfix listens on port 25 for both inbound SMTP reception and outbound direct sending via MX lookup.
 
-![Security Group Table Output](images/image7.png)
-*`aws ec2 describe-security-groups --output table` — all inbound rules confirmed. Tags: Team=Room3, Cohort=MEQ7.*
-
-![Security Group JSON Output](images/image10.png)
-*`aws ec2 describe-security-groups --output json` — machine-readable confirmation of all IpPermissions, including dual CIDR entries for port 22.*
-
 **Quick Reference:**
 
 | Task | Command |
@@ -568,13 +444,7 @@ The instance is attached to a **single** security group — no additional groups
 
 **Certificate Type:** Let's Encrypt Domain Validated (DV) with Subject Alternative Names (SAN)
 
-A single certificate covers the web server, mail server, and webmail app, verified by SSL Labs:
-
-![SSL Labs A+ Web Server](images/image27.png)
-*Qualys SSL Labs — `gwallofchina.yulcyberhub.click` at IP `54.226.198.180`: **A+** in 53.92 seconds. Assessed Wed, 25 Mar 2026.*
-
-![SSL Labs Detailed Certificate](images/image60.png)
-*SSL Labs certificate detail — **EC 256 bits (SHA384withECDSA)**. SAN covers both `gwallofchina.yulcyberhub.click` **and** `mail.gwallofchina.yulcyberhub.click` — one cert, two services. Valid Mar 25 → Jun 23 2026. Issuer: Let's Encrypt E8. **Certificate Transparency: Yes**. Revocation: Good (not revoked). Weak key: No.*
+A single certificate covers the web server, mail server, and webmail app, achieving a 100/100 certificate score on SSL Labs (EC 256 bits, SHA384withECDSA).
 
 **Why Let's Encrypt?**
 
@@ -595,35 +465,23 @@ sudo certbot --nginx --expand \
   -d mta-sts.gwallofchina.yulcyberhub.click
 ```
 
-**Certificate chain:**
+**Certificate chain:** `ISRG Root X1 → Let's Encrypt E8 → gwallofchina.yulcyberhub.click`
 
-```
-ISRG Root X1 → Let's Encrypt E8 → gwallofchina.yulcyberhub.click
-```
-
-**Certificate path:** `/etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem`  
-**SAN covers:** `gwallofchina.yulcyberhub.click`, `mail.gwallofchina.yulcyberhub.click`, `mta-sts.gwallofchina.yulcyberhub.click`  
-**Auto-renewal:** Managed by Certbot systemd timer  
+**Certificate path:** `/etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem`
+**SAN covers:** `gwallofchina.yulcyberhub.click`, `mail.gwallofchina.yulcyberhub.click`, `mta-sts.gwallofchina.yulcyberhub.click`
+**Auto-renewal:** Managed by Certbot systemd timer
 **Expiry:** 2026-07-02
-
-![HTTPS Certificate Chain from Kali](images/image26.png)
-*`openssl s_client -connect gwallofchina.yulcyberhub.click:443` from Kali — depth=2 ISRG Root X1 → depth=1 Let's Encrypt E8 → depth=0 domain. EC (prime256v1) key, ecdsa-with-SHA384. Valid Mar 25 → Jun 23 2026.*
-
-![HTTPS Certificate Chain from Rocky](images/image33.png)
-*Same command from Rocky Linux — `CONNECTED(00000003)`, `New, TLSv1.3, Cipher is TLS AES 256 GCM SHA384`. Peer Temp Key: X25519 (253-bit). Verification: OK.*
-
----
 
 ### 4.2 Protocol Selection
 
 | Protocol | Status | Reason |
 |---|---|---|
-| SSLv2 | ❌ Disabled | Cryptographic design broken (1995) |
-| SSLv3 | ❌ Disabled | POODLE (CVE-2014-3566) |
-| TLS 1.0 | ❌ Disabled | BEAST (CVE-2011-3389), RC4 dependency |
-| TLS 1.1 | ❌ Disabled | No AEAD support; deprecated RFC 8996 (2021) |
-| TLS 1.2 | ✅ Enabled | Industry baseline for ECDHE + AEAD |
-| TLS 1.3 | ✅ Enabled | PFS built-in, encrypted handshake, reduced latency |
+| SSLv2 | Disabled | Cryptographic design broken (1995) |
+| SSLv3 | Disabled | POODLE (CVE-2014-3566) |
+| TLS 1.0 | Disabled | BEAST (CVE-2011-3389), RC4 dependency |
+| TLS 1.1 | Disabled | No AEAD support; deprecated RFC 8996 (2021) |
+| TLS 1.2 | Enabled | Industry baseline for ECDHE + AEAD |
+| TLS 1.3 | Enabled | PFS built-in, encrypted handshake, reduced latency |
 
 ```nginx
 ssl_protocols TLSv1.2 TLSv1.3;
@@ -643,14 +501,6 @@ server {
 }
 ```
 
-![HTTP 301 Redirect](images/image24.png)
-*`curl -I http://gwallofchina.yulcyberhub.click` — `HTTP/1.1 301 Moved Permanently`, `Location: https://gwallofchina.yulcyberhub.click/`. Server header: `nginx` with no version disclosed.*
-
-![HTTP 301 — Early Verification](images/image43.png)
-*Second `curl -I` from Kali at 02:33 UTC — same 301 response. Confirms the redirect was live from initial deployment, not just at final testing time.*
-
----
-
 ### 4.3 Cipher Suites
 
 ```nginx
@@ -669,8 +519,6 @@ DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
 | 3–4 | `ECDHE-*-AES256-GCM-SHA384` | Higher key strength variants |
 | 5–6 | `ECDHE-*-CHACHA20-POLY1305` | ARM / mobile (no AES-NI) — t4g.small Graviton2 benefits here |
 | 7–8 | `DHE-RSA-AES*-GCM-SHA*` | PFS fallback for non-ECDHE clients |
-
----
 
 ### 4.4 Perfect Forward Secrecy (PFS)
 
@@ -699,12 +547,13 @@ ssl_session_cache shared:SSL:10m;
 ssl_session_timeout 1d;
 ```
 
-**Live TLS 1.3 handshake proof:**
+**Live TLS 1.3 handshake confirmation:**
 
-![TLS 1.3 Handshake — PFS Confirmed](images/image36.png)
-*`New, TLSv1.3, Cipher is TLS AES 256 GCM SHA384`. Peer signature: `ecdsa_secp256r1_sha256`. Peer Temp Key: **X25519, 253 bits** — ephemeral ECDH key exchange confirming PFS is active on every session. Verification: OK. SSL handshake: 2711 bytes read.*
-
----
+```
+New, TLSv1.3, Cipher is TLS AES 256 GCM SHA384
+Peer Temp Key: X25519, 253 bits — ephemeral ECDH key exchange confirming PFS is active
+Verification: OK
+```
 
 ### 4.5 HTTP Strict Transport Security (HSTS) & Security Headers
 
@@ -751,8 +600,6 @@ resolver 8.8.8.8 8.8.4.4 valid=300s;
 resolver_timeout 5s;
 ```
 
----
-
 ### 4.6 Service Hardening
 
 **Rate Limiting (DDoS mitigation):**
@@ -774,23 +621,55 @@ sudo chown nginx:nginx /var/cache/nginx
 sudo chmod 700 /var/cache/nginx
 ```
 
-![Nginx Cache Hardening](images/image4.png)
-*`mkdir -p /var/cache/nginx`, `chown nginx:nginx`, `chmod 700` — cache directory owned exclusively by the nginx process user. No other user or group has access.*
+**systemd sandboxing** — kernel-level confinement applied via service override (`systemctl edit nginx.service`):
 
-**systemd sandboxing** — kernel-level confinement applied via service override:
+```ini
+[Service]
+PrivateDevices=yes
+ProtectSystem=strict
+ProtectHome=yes
+NoNewPrivileges=yes
+```
 
-![Nginx systemd Sandboxing](images/image22.png)
-*`systemctl edit nginx.service` — `PrivateDevices=yes` (no raw device access), `ProtectSystem=strict` (filesystem read-only except /run and /tmp), `ProtectHome=yes` (home directories inaccessible), `NoNewPrivileges=yes` (blocks setuid/setgid escalation). Mandatory access control at the process level.*
+### 4.7 Final Configurations
 
-**Webmail reverse proxy configuration** (`/etc/nginx/conf.d/webmail.conf`):
+**1. The global WAF — `nginx.conf`**
+
+The main configuration acts as a lightweight intrusion detection system (IDS) using nginx map directives.
+
+- **Bot Mitigation:** The `blocked_agent` map identifies automated scanners (sqlmap, nikto, burpsuite, etc.) and drops the connection before information gathering can occur.
+- **URI Filtering:** The `blocked_uri` map provides a light WAF by blocking common attack patterns like path traversal (`../`), SQL injection (`union select`), and remote code execution (`/bin/bash`).
+- **Rate Limit Zones:** Pre-defined zones for global, login, and API allow different rate limits to be applied to different parts of the application.
+
+**2. The Gateway — `gwallofchina.conf`**
+
+This file handles the primary domain and enforces A+ Security rating standards.
+
+- **HSTS Enforcement:** `add_header Strict-Transport-Security "max-age=63072000;..."` caches the HTTPS requirement in browsers for 2 years.
+- **Logjam Protection:** `ssl_dhparam /etc/nginx/ssl/dhparam.pem` uses custom 4096-bit primes.
+- **OCSP Stapling:** Provides the certificate validity proof directly from the server, so the client's browser does not need to query the CA.
 
 ```nginx
-server {
-    listen 443 ssl; listen [::]:443 ssl;
-    http2 on;
-    server_name mail.gwallofchina.yulcyberhub.click;
+# --- Global Rate Limiting Zone ---
+limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
 
-    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem;
+# --- HTTP (Port 80) - Force Redirect to HTTPS ---
+server {
+    listen 80;
+    listen [::]:80;
+    server_name gwallofchina.yulcyberhub.click;
+    return 301 https://$host$request_uri;
+}
+
+# --- HTTPS (Port 443) - Secure Environment ---
+server {
+    listen 443 ssl;
+    listen [::]:443 ssl;
+    http2 on;
+
+    server_name gwallofchina.yulcyberhub.click;
+
+    ssl_certificate /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
@@ -799,153 +678,48 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    location /api/login {
-        limit_req zone=webmail_limit burst=5 nodelay;
-        proxy_pass http://127.0.0.1:3000;
-    }
-
-    location / {
-        proxy_pass         http://127.0.0.1:3000;
-        proxy_http_version 1.1;
-        proxy_set_header   Host              $host;
-        proxy_set_header   X-Real-IP         $remote_addr;
-        proxy_set_header   X-Forwarded-For   $proxy_add_x_forwarded_for;
-        proxy_set_header   Upgrade           $http_upgrade;
-        proxy_set_header   Connection        'upgrade';
-    }
-}
-```
-
-> **Important:** Each virtual host must have a unique `server_name` directive. If the webmail config shares the same `server_name` as the main site config, Nginx will serve the castle page for both hostnames.
-
----
-
-### 4.7 Final Configurations
-1. **The global WAF:** nginx.conf
-THe main configuration dosn't just serve files; it acts as a very very lightwheight intrusion detection system (IDS) using nginx map directives.
-- **Bot Mitigation:** The blocked_agent map identifies automated scanners (sqlmap, nikto, burpsuite, etc) and drops the connection before they can even attept to perform information gathering.
-- **URI Filtering:** The blcoked_uri map provides a "ligh WAF" by blocking common attack patterns like path traversal (../), SQL injection (union select), and remote code execution (/bin/bash).
-- **Rate limit Zones:** We pre-defined zones for global, login, and api, This allows us to apply different "speed limits" to different parts of the apps.
-
-2. **The Gateay:** gwallofchina.conf
-This file handles the primary domain and enforces the **A+ Security rating** standards.
-- **HSTS Enforcement:** add header Strict-Transport-Securityy "max-age=63072000;..." tells browsers to cach the HTTPS requriement for 2 years.
-- **Logjam Protection:** ssl_dhparam /etc/nginx/ssl/dhparam.pem uses a custom 4096-bit primes, moviging us beyond the standard (and potentially vulnerable) 2048-bit defaults.
-- **OCSP Stapling:** This improves performance and privacy by providing the "the certificate is valid" proof directly from our server, so the client's browser dosn't have o query the CA.
-
-```properties
-# --- Global Rate Limiting Zone ---
-# Define the memory zone (10m) and the rate (10 requests per second per IP)
-limit_req_zone $binary_remote_addr zone=mylimit:10m rate=10r/s;
-
-# --- HTTP (Port 80) - Force Redirect to HTTPS ---
-server {
-    if ($host = gwallofchina.yulcyberhub.click) {
-        return 301 https://$host$request_uri;
-    } # managed by Certbot
-
-
-    listen 80;
-    listen [::]:80;
-    server_name gwallofchina.yulcyberhub.click;
-
-    # 301 Redirect ensures all unencrypted traffic is moved to Port 443
-    return 301 https://$host$request_uri;
-
-
-}
-
-# --- HTTPS (Port 443) - Secure Environment ---
-server {
-    listen 443 ssl;
-    listen [::]:443 ssl;
-    http2 on; 
-
-    server_name gwallofchina.yulcyberhub.click;
-
-    # SSL Certificate Paths (Let's Encrypt)
-    ssl_certificate /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem; # managed by Certbot
-
-    # Protocol & Cipher Hardening
-    ssl_protocols TLSv1.2 TLSv1.3;
-    ssl_prefer_server_ciphers on;
-    ssl_session_cache shared:SSL:10m;
-    ssl_session_timeout 1d;
-    ssl_session_tickets off;
-
-    # High-Entropy Ciphers (Prioritizing AEAD)
     ssl_ciphers ECDHE-ECDSA-AES128-GCM-SHA256:ECDHE-RSA-AES128-GCM-SHA256:ECDHE-ECDSA-AES256-GCM-SHA384:ECDHE-RSA-AES256-GCM-SHA384:ECDHE-ECDSA-CHACHA20-POLY1305:ECDHE-RSA-CHACHA20-POLY1305:DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
 
-    # Custom 4096-bit DH Parameters (Mitigates Logjam)
     ssl_dhparam /etc/nginx/ssl/dhparam.pem;
 
-    # --- OCSP Stapling (Performance & Privacy) ---
     ssl_stapling on;
     ssl_stapling_verify on;
     resolver 8.8.8.8 8.8.4.4 valid=300s;
     resolver_timeout 5s;
 
-    # --- SECURITY HEADERS (The 'A+' Requirements) ---
-
-    # HSTS: Forces browser-side HTTPS enforcement for 2 years
     add_header Strict-Transport-Security "max-age=63072000; includeSubDomains; preload" always;
-
-    # Anti-Clickjacking & XSS Protection
     add_header X-Frame-Options "SAMEORIGIN" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header X-Content-Type-Options "nosniff" always;
-
-    # Modern Privacy & Referrer Controls
     add_header Referrer-Policy "strict-origin-when-cross-origin" always;
     add_header X-Permitted-Cross-Domain-Policies "none" always;
-
-    # Content Security Policy (Hardened)
     add_header Content-Security-Policy "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; upgrade-insecure-requests;" always;
-
-    # Permissions Policy (Restricts hardware access)
     add_header Permissions-Policy "geolocation=(), microphone=(), camera=(), payment=()" always;
-
-    # Cross-Origin Isolation (Mitigates Spectre-like attacks)
     add_header Cross-Origin-Opener-Policy "same-origin" always;
     add_header Cross-Origin-Embedder-Policy "require-corp" always;
     add_header Cross-Origin-Resource-Policy "same-origin" always;
 
-    # --- END SECURITY HEADERS ---
-
-    # Document Root and Index
     root /var/www/html;
     index index.html;
 
-    # Logging
     access_log /var/log/nginx/gwallofchina.access.log;
     error_log /var/log/nginx/gwallofchina.error.log;
 
     location / {
-        # Apply the Rate Limit: Allows bursts of 20 but keeps steady 10r/s
         limit_req zone=mylimit burst=20 nodelay;
-        
         try_files $uri $uri/ =404;
     }
-
 }
-
 ```
 
+**3. The Webmail Bridge — `webmail.conf`**
 
-3. **The Webmail Bridge:** webmail.conf
-This is the most critical file for the user experience. it acts as a reverse proxy between the internet and the Node.js app running on port 3000.
-- **Targeted Rate limiting
+Acts as a reverse proxy between the internet and the Node.js app running on port 3000.
+
+- **Targeted Rate Limiting:** The `/api/login` location limits authenticated attempts to 5 per minute per IP, making brute-force attacks mathematically unfeasible even if a bot bypasses the User-Agent check.
+- **Header Passing:** The `proxy_set_header` directives ensure the Node.js app knows the real IP of the visitor, which is essential for accurate logging and security auditing.
+
 ```nginx
-location /api/login {
-limit_req zone=webmail_limit burst=5 nodelay;
-}
-
-This specifically targets the login endpoint. Even if a bot manages to bypass the User-Agent check, it is limited to **5 attempts per minute**, making brute-force attacks mathematically unfeasible.
-```
-- **Header Passing:** The proxy_set_header directives (like X-Forwarded-For) ensures that the Node.js app knows the **real IP** of the visitor, which is essential for acurate logging and security auditing within the app itself**
-
-```properties
 # Rate limiting zone
 limit_req_zone $binary_remote_addr zone=webmail_limit:10m rate=5r/m;
 
@@ -964,8 +738,8 @@ server {
     http2 on;
     server_name mail.gwallofchina.yulcyberhub.click;
 
-    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem; # managed by Certbot
-    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;  # managed by Certbot
+    ssl_certificate     /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem;
 
     ssl_protocols TLSv1.2 TLSv1.3;
     ssl_prefer_server_ciphers on;
@@ -973,18 +747,15 @@ server {
     ssl_session_timeout 1d;
     ssl_session_tickets off;
 
-    # Security headers
     add_header Strict-Transport-Security "max-age=63072000" always;
     add_header X-Frame-Options "DENY" always;
     add_header X-Content-Type-Options "nosniff" always;
     add_header X-XSS-Protection "1; mode=block" always;
     add_header Referrer-Policy "no-referrer" always;
 
-    # Logging
     access_log /var/log/nginx/webmail.access.log;
     error_log  /var/log/nginx/webmail.error.log;
 
-    # Rate limit login endpoint
     location /api/login {
         limit_req zone=webmail_limit burst=5 nodelay;
         proxy_pass         http://127.0.0.1:3000;
@@ -994,7 +765,6 @@ server {
         proxy_set_header   X-Forwarded-For $proxy_add_x_forwarded_for;
     }
 
-    # All other traffic
     location / {
         proxy_pass         http://127.0.0.1:3000;
         proxy_http_version 1.1;
@@ -1005,18 +775,23 @@ server {
         proxy_set_header   Connection        'upgrade';
     }
 }
-
 ```
-
-
-
-
----
 
 ### 4.8 Verification
 
-![Nginx Verify Script](images/image2.png)
-*`nginx_verify3.0.sh` automated output — all checks passed: TLS 1.2 ✅, TLS 1.3 ✅, TLS 1.1 correctly rejected ✅, TLS 1.0 correctly rejected ✅, HTTP/2 active ✅, HTTP redirect 301 ✅, HTTPS 200 OK ✅, all 11 security headers present ✅, server version not disclosed ✅.*
+Automated `nginx_verify3.0.sh` output — all checks passed:
+
+```
+TLS 1.2       ✅ PASS
+TLS 1.3       ✅ PASS
+TLS 1.1       ✅ PASS (correctly rejected)
+TLS 1.0       ✅ PASS (correctly rejected)
+HTTP/2        ✅ PASS (active)
+HTTP redirect ✅ PASS (301)
+HTTPS         ✅ PASS (200 OK)
+Security headers (11) ✅ PASS
+Server version ✅ PASS (not disclosed)
+```
 
 ---
 
@@ -1037,16 +812,7 @@ sudo chmod -R 750 /etc/letsencrypt/live/ /etc/letsencrypt/archive/
 sudo find /etc/letsencrypt/live/ -type d -exec chmod g+s {} +
 ```
 
-The Dovecot certificate paths were configured to point directly to the Let's Encrypt live directory:
-
-![Dovecot SSL Certificate Config](images/image42.png)
-*`/etc/dovecot/conf.d/10-ssl.conf` — `ssl_cert = </etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem` and `ssl_key = </etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem`. The `<` operator reads the file content. This is the same SAN certificate covering both web and mail.*
-
----
-
 ### 5.2 Installation
-
-Postfix and Dovecot were installed from the Rocky Linux AppStream repository and enabled to start on boot:
 
 ```bash
 sudo dnf install postfix cyrus-sasl-plain mailx -y
@@ -1056,33 +822,24 @@ sudo dnf install dovecot -y
 sudo systemctl enable --now dovecot
 ```
 
-![Postfix Already Installed](images/image53.png)
-*`sudo dnf install postfix cyrus-sasl-plain -y` — both packages already present (`postfix-2:3.8.5-8.el10.aarch64`, `cyrus-sasl-plain-2.1.28-29.el10.aarch64`). `sudo systemctl enable --now postfix` enables the service. The annotation confirms idempotent installation.*
-
-![Full Dovecot Installation](images/image29.png)
-*Full `dnf install dovecot` output — version `1:2.3.21-16.el10.aarch64`, 4.8 MB from AppStream. `sudo systemctl enable --now dovecot` creates the systemd symlink. Both services pinned to start on boot.*
-
----
+Versions installed: `postfix-2:3.8.5-8.el10.aarch64`, `cyrus-sasl-plain-2.1.28-29.el10.aarch64`, `dovecot-1:2.3.21-16.el10.aarch64`
 
 ### 5.3 Protocol Selection
 
-**Dovecot minimum protocol — `/etc/dovecot/conf.d/10-ssl.conf`:**
-
-![Dovecot ssl_min_protocol](images/image40.png)
-*`ssl_min_protocol = TLSv1.2` — Dovecot recognises `SSLv3`, `TLSv1`, `TLSv1.1`, `TLSv1.2`, `TLSv1.3`, `ANY`, and `LATEST`. Setting `TLSv1.2` enforces the same minimum as Nginx — all pre-TLS-1.2 connections rejected at the daemon level.*
-
-**Disabling plaintext IMAP — `/etc/dovecot/conf.d/10-master.conf`:**
-
-![Dovecot imap-login Port Config](images/image44.png)
-*`inet_listener imap { port = 0 }` — plaintext IMAP disabled (no listener bound). `inet_listener imaps { port = 993; ssl = yes }` — only encrypted IMAPS accepted. Plaintext login is architecturally impossible.*
-
-**Full Dovecot SSL block:**
+**Dovecot — `/etc/dovecot/conf.d/10-ssl.conf`:**
 
 ```ini
 ssl = required
 ssl_cert = </etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem
 ssl_key  = </etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem
 ssl_min_protocol = TLSv1.2
+```
+
+**Disabling plaintext IMAP — `/etc/dovecot/conf.d/10-master.conf`:**
+
+```ini
+inet_listener imap { port = 0 }          # plaintext IMAP disabled
+inet_listener imaps { port = 993; ssl = yes }  # encrypted IMAPS only
 ```
 
 **Postfix outbound TLS:**
@@ -1096,11 +853,6 @@ sudo postconf -e "mydomain = gwallofchina.yulcyberhub.click"
 sudo postconf -e "myorigin = \$mydomain"
 ```
 
-**Hostname verification:**
-
-![Postfix myhostname](images/image23.png)
-*`postconf myhostname` → `myhostname = mail.gwallofchina.yulcyberhub.click`. This is what Postfix presents in HELO/EHLO banners and what receiving servers validate against the PTR/MX record.*
-
 **Port allocation:**
 
 | Port | Service | Protocol | Rationale |
@@ -1110,16 +862,7 @@ sudo postconf -e "myorigin = \$mydomain"
 | 993 | IMAPS | Implicit TLS | No STARTTLS downgrade possible |
 | 587 | SMTP Relay | STARTTLS | Used by SendGrid fallback relay (outbound only) |
 
-**Port listening verification:**
-
-![Mail Ports Listening](images/image31.png)
-*`sudo ss -tulpn | grep -E ':(465|587|993)'` — all six entries confirmed: `0.0.0.0:587`, `0.0.0.0:993`, `0.0.0.0:465` and their `[::]` IPv6 equivalents. Postfix and Dovecot bound on all interfaces.*
-
----
-
 ### 5.4 Cipher Suites & Inbound TLS Hardening
-
-Postfix was hardened for both inbound (smtpd) and outbound (smtp) TLS, reusing the same 4096-bit DH parameters generated for Nginx:
 
 ```bash
 sudo postconf -e "smtpd_tls_cert_file = /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem"
@@ -1130,26 +873,16 @@ sudo postconf -e "smtpd_tls_mandatory_protocols = !SSLv2, !SSLv3, !TLSv1, !TLSv1
 sudo postconf -e "smtpd_tls_dh1024_param_file = /etc/nginx/ssl/dhparam.pem"
 ```
 
-![Postfix SMTPD TLS Configuration](images/image52.png)
-*All `postconf -e` commands applied to Rocky Linux: cert/key paths, `security_level = may` (opportunistic inbound TLS), legacy protocols explicitly excluded (`!SSLv2, !SSLv3, !TLSv1, !TLSv1.1`), and the 4096-bit DH param file shared from the Nginx configuration — Logjam mitigation applied consistently across both services.*
-
----
-
 ### 5.5 SMTP Authentication — The Secret Pipe
 
-Postfix is configured to send mail **directly** via SMTP MX lookup as the primary delivery path. SendGrid is configured exclusively as a **fallback relay**, activating automatically only when direct delivery fails — for example, if a destination server rejects our IP, or if a transient network issue prevents a direct connection.
+Postfix is configured to send mail **directly** via SMTP MX lookup as the primary delivery path. SendGrid is configured exclusively as a **fallback relay**, activating automatically only when direct delivery fails.
 
 This dual-path architecture is reflected in `main.cf`:
 
 ```ini
-# Direct sending with SendGrid fallback
-# Empty relayhost = Postfix performs MX lookup and delivers directly (PRIMARY)
 relayhost =
-
-# SendGrid activates only when direct delivery fails (FALLBACK)
 fallback_relay = [smtp.sendgrid.net]:587
 
-# SendGrid Auth (used only when fallback_relay activates)
 smtp_sasl_auth_enable = yes
 smtp_sasl_password_maps = lmdb:/etc/postfix/sasl_passwd
 smtp_sasl_security_options = noanonymous
@@ -1158,9 +891,7 @@ smtp_tls_security_level = may
 smtp_tls_loglevel = 1
 ```
 
-> **Why this design?** Direct sending preserves full control over mail headers and avoids SendGrid rate limits on the free tier. The fallback ensures delivery continuity if direct port 25 access is restricted at the AWS account level. Oracle (instructor) is handling the AWS port 25 unblock request for EC2 instance `54.226.198.180`.
-
----
+> **Why this design?** Direct sending preserves full control over mail headers and avoids SendGrid rate limits on the free tier. The fallback ensures delivery continuity if direct port 25 access is restricted at the AWS account level.
 
 ### 5.5.1 OpenDKIM — Local DKIM Signing
 
@@ -1288,8 +1019,6 @@ postfix/smtp[358515]: 70AA1181F800: relay=gmail-smtp-in.l.google.com[:25], statu
 
 **Postfix ↔ Dovecot SASL Integration:**
 
-Authentication is delegated from Postfix to Dovecot via a Unix socket, avoiding the need for a separate SASL daemon:
-
 ```bash
 sudo postconf -e "smtpd_sasl_type = dovecot"
 sudo postconf -e "smtpd_sasl_path = private/auth"
@@ -1297,13 +1026,17 @@ sudo postconf -e "smtpd_sasl_auth_enable = yes"
 sudo systemctl restart postfix
 ```
 
-![Postfix SASL Dovecot Integration](images/image41.png)
-*`smtpd_sasl_type = dovecot`, `smtpd_sasl_path = private/auth`, `smtpd_sasl_auth_enable = yes`. Postfix now delegates all SASL authentication decisions to Dovecot's auth daemon via the Unix socket at `private/auth` (relative to Postfix's chroot queue directory).*
-
 **Dovecot SASL socket configuration — `/etc/dovecot/conf.d/10-master.conf`:**
 
-![Dovecot unix_listener Config](images/image49.png)
-*`unix_listener /var/spool/postfix/private/auth { mode = 0666; user = postfix; group = postfix }`. Mode `0666` is required because Postfix cannot use `0600` — it runs as its own user and must have socket access. Owner and group are `postfix`, keeping the socket boundary correct. `0777` would allow all users — `0666` restricts to explicit socket connections.*
+```ini
+unix_listener /var/spool/postfix/private/auth {
+  mode = 0666
+  user = postfix
+  group = postfix
+}
+```
+
+Mode `0666` is required because Postfix cannot use `0600` — it runs as its own user and must have socket access. `0777` would allow all users — `0666` restricts to explicit socket connections.
 
 **`/etc/postfix/master.cf` — key services:**
 
@@ -1327,27 +1060,19 @@ smtps     inet  n       -       n       -       -       smtpd
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
 ```
 
-![Postfix Auth Socket](images/image20.png)
-*`/var/spool/postfix/private/auth` — `srw-rw----` (660). Socket accessible to Postfix and `mail` group only — no world-readable exposure of the SASL channel.*
-
 **SendGrid fallback relay credentials — `/etc/postfix/sasl_passwd`:**
 
 ```bash
-# Store credential (used ONLY when fallback_relay activates)
 echo "[smtp.sendgrid.net]:587 apikey:SG.YOUR_KEY_HERE" \
   | sudo tee /etc/postfix/sasl_passwd
 
-# Compile to LMDB (Rocky Linux — Berkeley DB removed)
 sudo postmap lmdb:/etc/postfix/sasl_passwd
-
-# Lock down — credential file must never be world-readable
 sudo chmod 0600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.lmdb
 ```
 
 **Full relay and database configuration:**
 
 ```bash
-# Leave relayhost empty — direct delivery is primary
 sudo postconf -e "relayhost ="
 sudo postconf -e "fallback_relay = [smtp.sendgrid.net]:587"
 sudo postconf -e "smtp_sasl_auth_enable = yes"
@@ -1360,21 +1085,11 @@ sudo postconf -e "alias_maps = lmdb:/etc/aliases"
 
 > **Rocky Linux compatibility:** Rocky Linux 9/10 removed Berkeley DB — all `hash:` map types fail with `unsupported dictionary type: hash`. Migrating everything to `lmdb:` resolved this.
 
-**STARTTLS local verification:**
-
-![STARTTLS localhost Test](images/image50.png)
-*`openssl s_client -starttls smtp -connect localhost:25` — confirms Postfix correctly advertises and negotiates STARTTLS on the local SMTP port. The full inbound TLS pipeline is verified on the server itself.*
-
----
-
 ### 5.6 Virtual Mailbox Configuration
-
-Virtual mailboxes allow Postfix to deliver mail to filesystem paths for multiple users without requiring OS-level user accounts. This is a critical change from the default local delivery setup.
 
 **Key parameters in `/etc/postfix/main.cf`:**
 
 ```ini
-# Virtual mailbox setup
 virtual_mailbox_domains = gwallofchina.yulcyberhub.click
 virtual_mailbox_maps    = lmdb:/etc/postfix/vmailbox
 virtual_mailbox_base    = /var/mail/vhosts
@@ -1402,15 +1117,12 @@ After any edit, always recompile:
 sudo postmap lmdb:/etc/postfix/vmailbox
 ```
 
-**Maildir provisioning** — Postfix does not create the directory structure automatically:
+**Maildir provisioning:**
 
 ```bash
-# Create Maildir structure for each user
 sudo mkdir -p /var/mail/vhosts/gwallofchina.yulcyberhub.click/USER/Maildir/{cur,new,tmp}
 sudo chown -R vmail:vmail /var/mail/vhosts/
 sudo chmod -R 700 /var/mail/vhosts/
-
-# Parent directories must remain traversable
 sudo chmod 755 /var/mail
 sudo chmod 755 /var/mail/vhosts
 ```
@@ -1465,11 +1177,7 @@ Generate a password hash with:
 doveadm pw -s SHA512-CRYPT
 ```
 
----
-
 ### 5.7 Inbound Mail — Direct SMTP Reception
-
-Inbound mail is now received directly by Postfix on port 25. The MX record points to `mail.gwallofchina.yulcyberhub.click` (EC2 instance). Port 25 is open in the security group and unblocked at the AWS account level by Oracle (instructor).
 
 **Inbound mail flow:**
 
@@ -1496,15 +1204,9 @@ sudo ss -tlnp | grep :25
 # Expected: LISTEN 0 100 0.0.0.0:25
 ```
 
-**Watch inbound delivery in real time:**
-
 ```bash
 sudo tail -f /var/log/maillog
 ```
-
-> **Note:** The SendGrid Inbound Parse webhook (`/api/inbound`) remains configured as a legacy fallback path but is no longer the primary inbound route.
-
----
 
 ### 5.8 Webmail Application
 
@@ -1533,43 +1235,28 @@ A custom Node.js webmail application is deployed at `https://mail.gwallofchina.y
     └── index.html     ← Frontend UI
 ```
 
-**Looking at the app**
-
-![IMAPS from Rocky Linux](images/webmail_app.png)
-
 **Installation:**
 
 ```bash
-# Node.js 20
 sudo dnf module enable nodejs:20 -y
 sudo dnf install nodejs -y
 
-# App dependencies
 cd /opt/webmail
 npm install
 
-# PM2 — must run as root for vmail directory access
 sudo npm install -g pm2
 sudo /usr/local/bin/pm2 start /opt/webmail/server.js --name webmail
 sudo /usr/local/bin/pm2 save
 sudo /usr/local/bin/pm2 startup
 ```
 
-> **PM2 must run as root** because the Node.js process needs write access to `/var/mail/vhosts/` (owned by `vmail`, uid 5000) when the inbound webhook delivers messages. Non-root PM2 instances will fail silently on inbound delivery.
+> **PM2 must run as root** because the Node.js process needs write access to `/var/mail/vhosts/` (owned by `vmail`, uid 5000). Non-root PM2 instances will fail silently on inbound delivery.
 
-**Features:**
-
-- Login via Dovecot IMAP credentials (full email address as username)
-- Read, send, reply, forward, and delete email
-- Folder switching (Inbox, Sent, Drafts, Trash, Spam)
-- Unread badge count and client-side search
-- Sessions persist for 8 hours with random session secret via environment variable
-
----
+**Features:** Login via Dovecot IMAP credentials · Read, send, reply, forward, delete email · Folder switching (Inbox, Sent, Drafts, Trash, Spam) · Unread badge count · Client-side search · Sessions persist 8 hours with random session secret.
 
 ### 5.9 SPF / DKIM / DMARC / MTA-STS
 
-**SPF — Soft Fail (includes SendGrid for fallback):**
+**SPF:**
 
 ```dns
 @ TXT "v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all"
@@ -1579,23 +1266,19 @@ sudo /usr/local/bin/pm2 startup
 
 **DKIM — Two signing paths:**
 
-*Local signing via OpenDKIM (direct send — primary):*
+Local signing via OpenDKIM (direct send — primary):
 
 ```dns
 mail._domainkey  TXT  "v=DKIM1; k=rsa; p=<public key>"
 ```
 
-OpenDKIM signs every outbound message before it leaves Postfix, using selector `mail`. This is what allows direct SMTP delivery to pass DMARC without going through SendGrid.
-
-*CNAME delegation to SendGrid (fallback relay):*
+CNAME delegation to SendGrid (fallback relay):
 
 ```dns
 s1._domainkey  CNAME  s1.domainkey.u61568083.wl084.sendgrid.net
 s2._domainkey  CNAME  s2.domainkey.u61568083.wl084.sendgrid.net
 em5287         CNAME  u61568083.wl084.sendgrid.net
 ```
-
-CNAME-based DKIM allows SendGrid to rotate 2048-bit RSA keys automatically without requiring manual DNS updates. These selectors are only used when the `fallback_relay` activates.
 
 **DMARC — Strict reject policy:**
 
@@ -1617,8 +1300,6 @@ _dmarc TXT "v=DMARC1; p=reject; rua=mailto:admin@gwallofchina.yulcyberhub.click;
 _mta-sts  TXT  "v=STSv1; id=20260403000000"
 _smtp._tls TXT  "v=TLSRPTv1; rua=mailto:admin@gwallofchina.yulcyberhub.click"
 ```
-
-MTA-STS prevents SMTP MitM downgrade attacks by requiring TLS with a valid certificate. TLS-RPT reports any encryption failures or downgrade attempts.
 
 **MTA-STS policy file** — served at `https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt`:
 
@@ -1668,8 +1349,6 @@ server {
 curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
 ```
 
----
-
 ### 5.10 Adding a New User
 
 ```bash
@@ -1684,28 +1363,21 @@ sudo postmap lmdb:/etc/postfix/vmailbox
 sudo mkdir -p /var/mail/vhosts/gwallofchina.yulcyberhub.click/user/Maildir/{cur,new,tmp}
 sudo chown -R vmail:vmail /var/mail/vhosts/
 sudo chmod -R 700 /var/mail/vhosts/
+sudo chmod 755 /var/mail && sudo chmod 755 /var/mail/vhosts
 
-# 4. Fix parent directory permissions (required for traversal)
-sudo chmod 755 /var/mail
-sudo chmod 755 /var/mail/vhosts
-
-# 5. Generate password hash and add to Dovecot
-doveadm pw -s SHA512-CRYPT   # enter password when prompted, copy the hash output
+# 4. Generate password hash and add to Dovecot
+doveadm pw -s SHA512-CRYPT
 echo "user@gwallofchina.yulcyberhub.click:{SHA512-CRYPT}HASH:5000:5000::/var/mail/vhosts/gwallofchina.yulcyberhub.click/user" \
   | sudo tee -a /etc/dovecot/users
 
-# 6. Reload services
+# 5. Reload services
 sudo systemctl reload postfix dovecot
 
-# 7 Automation (can be found in scripts)
+# 6. Automation (can be found in scripts)
 sudo ./mail-admin.sh add <user>
 ```
 
----
-
 ### 5.11 Client Mail App Settings
-
-For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mail, etc.):
 
 | Setting | Value |
 |---|---|
@@ -1713,57 +1385,41 @@ For connecting any standard IMAP/SMTP mail client (Thunderbird, Outlook, iOS Mai
 | IMAP Port | `993` (SSL/TLS) |
 | SMTP Server | `mail.gwallofchina.yulcyberhub.click` |
 | SMTP Port | `587` (STARTTLS) |
-| Username | Full email address (e.g. `<user>@gwallofchina.yulcyberhub.click`) |
+| Username | Full email address (e.g. `user@gwallofchina.yulcyberhub.click`) |
 | Password | Set with `doveadm pw` |
 
----
+### 5.12 SendGrid Fallback, Webmail Interactions, and Final Configuration Files
 
-### 5.12 Sendgrid fallback mechanisms, Webmail Interactions and final configuration files.
-The Postfix configurations are set to act as its own master mailer first. and only uses
-Sendgrid as the fallback if it cannot rech the destinattion
-    
-    # Direct sending (Empty relayhost forces MX lookups)
-    relayhost = 
-    
-    # SendGrid Fallback (Triggered only on connection failure)
-    fallback_relay = [smtp.sendgrid.net]:587
+**How the fallback works:**
 
-**How the fallback Works:**
-1. **Step 1 (Direct):** When you send an email, Postfix looks up the **MX record** of the recipient (e.g., Gmail). It attempts to connect to Gmail's server on **port 25**.
-2.  **Step 2 (The Trigger):** if port 25 is blocked by the ISP, AWS, or if the recipient server id down,  postfix triggets the **fallback_relay**. To maximize availability to our current infrastructure users, and future clients.
-3.  **Step 3 (The Handshake):** Postfix connect to **smtp.sendgrid.net** on **port 587**. it presents the API key stored in **/etc/postfix/sasl_passwd** to prive is is an authorized sender.
-4.  **Step 4 (Delivery):** SendGrid accepts the mail and delivers it on your behalf.
+1. **Step 1 (Direct):** When you send an email, Postfix looks up the **MX record** of the recipient (e.g., Gmail) and attempts to connect to their server on **port 25**.
+2. **Step 2 (The Trigger):** If port 25 is blocked by the ISP, AWS, or if the recipient server is down, Postfix triggers the **fallback_relay**.
+3. **Step 3 (The Handshake):** Postfix connects to **smtp.sendgrid.net** on **port 587** and presents the API key stored in `/etc/postfix/sasl_passwd`.
+4. **Step 4 (Delivery):** SendGrid accepts the mail and delivers it on your behalf.
 
-**Webmail Interactions: the "Secret Pipe"**:
-The Webmail app does not talk to the mailbox files directly it talks to **dovecot** via the **IMAPS** protocol.
-**Authentication Path**
-When a user logs into the webmail:
-1. **Credential Check:** The webmail sends the username/password to Dovecot.
-2. **The Source of Truth:** Dovecot looks at the managed file: **/etc/dovecot/users**.
-3. **The Hash:** It compared the provided password againts the **SHA512-CRYPT** hash we manualy insert, or via the script that manages users **mail-admin.sh**.
+**Webmail Interactions — the "Secret Pipe":**
 
-**Configuration in auth-passwdfile.conf.ext**
+The webmail app does not talk to the mailbox files directly — it talks to **Dovecot** via the **IMAPS** protocol.
 
-    passdb {
-      driver = passwd-file
-      args = scheme=CRYPT username_format=%u /etc/dovecot/users
-    }
-    
-    userdb {
-      driver = passwd-file
-      args = username_format=%u /etc/dovecot/users
-    }
+When a user logs in: the webmail sends credentials to Dovecot → Dovecot checks `/etc/dovecot/users` → compares against the **SHA512-CRYPT** hash → grants or denies access.
 
-**Final configuration files for Webmail/Email Server configurations:**
-1. **The Traffic Controller:** /etc/postfix/main.cf
-This is the most critical file. It defines the "Direct-First" logic and points Postfix to your security certificates.
-- **Key Parameters:**
-    - relayhost = (must be empty for direct sending).
-    - fallback_relay = [smtp.sendgrid.net:587 (the safety net).
-    - smtpd_tls_cert_file / key_file (points to the lets encrypt SAN certs).
-    - virtual_mailbox_domains & virtual_mailbox_maps (Points to our domain and LMDB file).
- 
-```properties
+**Configuration in `auth-passwdfile.conf.ext`:**
+
+```ini
+passdb {
+  driver = passwd-file
+  args = scheme=CRYPT username_format=%u /etc/dovecot/users
+}
+
+userdb {
+  driver = passwd-file
+  args = username_format=%u /etc/dovecot/users
+}
+```
+
+**Final `/etc/postfix/main.cf`:**
+
+```ini
 # --- Hostname and Domain Settings ---
 myhostname = mail.gwallofchina.yulcyberhub.click
 mydomain = gwallofchina.yulcyberhub.click
@@ -1772,12 +1428,8 @@ inet_interfaces = all
 inet_protocols = ipv4
 
 # --- Destination and Relay ---
-# CRITICAL: Since you are using virtual_mailbox_domains, 
-# your domain SHOULD NOT be in mydestination.
 mydestination = $myhostname, localhost.$mydomain, localhost
-
-# Direct sending with SendGrid fallback
-relayhost = 
+relayhost =
 fallback_relay = [smtp.sendgrid.net]:587
 
 # SendGrid Auth
@@ -1805,13 +1457,11 @@ virtual_mailbox_domains = gwallofchina.yulcyberhub.click
 virtual_mailbox_base = /var/mail/vhosts
 virtual_mailbox_maps = lmdb:/etc/postfix/vmailbox
 virtual_transport = lmtp:unix:private/dovecot-lmtp
-
-# Virtual User IDs (vmail)
 virtual_minimum_uid = 100
 virtual_uid_maps = static:5000
 virtual_gid_maps = static:5000
 
-# --- SSL/TLS Settings (A+ Grade) ---
+# --- SSL/TLS Settings ---
 smtpd_tls_cert_file = /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/fullchain.pem
 smtpd_tls_key_file = /etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem
 smtpd_tls_security_level = may
@@ -1836,33 +1486,13 @@ smtpd_milters = inet:localhost:8891
 non_smtpd_milters = inet:localhost:8891
 alias_maps = lmdb:/etc/aliases
 alias_database = lmdb:/etc/aliases
+```
+
+**Final `/etc/postfix/master.cf`:**
 
 ```
-2. **The Delivery Instructions:** /etc/postfix/master.cf
-This file manages how different services (SMTP, Submission, SMTPS) behaves.
-- **Key Sections to Verify:**
-    - **Submission (587): Must have smtpd_sasl_auth_enable=yes so the webmail can send mail.
-    - **Custom Transports:** Ensure the direct-smtp and sendgrid transports are defined at the bottom for the rate-limiting required by AWS.
-
-```properties
-#
-# Postfix master process configuration file.  For details on the format
-# of the file, see the master(5) manual page (command: "man 5 master" or
-# on-line: http://www.postfix.org/master.5.html).
-#
-# Do not forget to execute "postfix reload" after editing this file.
-#
-# ==========================================================================
-# service type  private unpriv  chroot  wakeup  maxproc command + args
-#               (yes)   (yes)   (no)    (never) (100)
-# ==========================================================================
 smtp      inet  n       -       n       -       -       smtpd
-#smtp      inet  n       -       n       -       1       postscreen
-#smtpd     pass  -       -       n       -       -       smtpd
-#dnsblog   unix  -       -       n       -       0       dnsblog
-#tlsproxy  unix  -       -       n       -       0       tlsproxy
 
-# Submission port 587 — authenticated relay (clients sending outbound mail)
 submission inet n       -       n       -       -       smtpd
   -o syslog_name=postfix/submission
   -o smtpd_tls_security_level=encrypt
@@ -1870,18 +1500,15 @@ submission inet n       -       n       -       -       smtpd
   -o smtpd_tls_auth_only=yes
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
 
-# SMTPS port 465 — implicit TLS (no STARTTLS downgrade possible)
 smtps     inet  n       -       n       -       -       smtpd
   -o syslog_name=postfix/smtps
   -o smtpd_tls_wrappermode=yes
   -o smtpd_sasl_auth_enable=yes
   -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
 
-#628       inet  n       -       n       -       -       qmqpd
 pickup    unix  n       -       n       60      1       pickup
 cleanup   unix  n       -       n       -       0       cleanup
 qmgr      unix  n       -       n       300     1       qmgr
-#qmgr     unix  n       -       n       300     1       oqmgr
 tlsmgr    unix  -       -       n       1000?   1       tlsmgr
 rewrite   unix  -       -       n       -       -       trivial-rewrite
 bounce    unix  -       -       n       -       0       bounce
@@ -1894,7 +1521,6 @@ proxywrite unix -       -       n       -       1       proxymap
 smtp      unix  -       -       n       -       -       smtp
 relay     unix  -       -       n       -       -       smtp
         -o syslog_name=postfix/$service_name
-#       -o smtp_helo_timeout=5 -o smtp_connect_timeout=5
 showq     unix  n       -       n       -       -       showq
 error     unix  -       -       n       -       -       error
 retry     unix  -       -       n       -       -       error
@@ -1908,9 +1534,7 @@ postlog   unix-dgram n  -       n       -       1       postlogd
 
 # ====================================================================
 # Custom transports — Direct sending + SendGrid relay
-# Rate limited to 1 email/min each
 # ====================================================================
-
 direct-smtp  unix  -  -  n  -  1  smtp
     -o smtp_destination_rate_delay=60s
     -o smtp_destination_concurrency_limit=1
@@ -1924,46 +1548,107 @@ sendgrid     unix  -  -  n  -  1  smtp
     -o relayhost=[smtp.sendgrid.net]:587
     -o smtp_sasl_password_maps=lmdb:/etc/postfix/sasl_passwd
     -o smtp_sasl_security_options=noanonymous
+```
+
+**Final Dovecot configuration (from `doveconf -n`):**
+
+```ini
+# /etc/dovecot/dovecot.conf — Dovecot 2.3.21
+# OS: Linux 6.12.0-124.8.1.el10_1.aarch64 aarch64 Rocky Linux release 10.1
+
+auth_mechanisms = plain login
+first_valid_uid = 5000
+mail_location = maildir:~/Maildir
+mbox_write_locks = fcntl
+
+namespace inbox {
+  inbox = yes
+  mailbox Drafts { special_use = \Drafts }
+  mailbox Junk   { special_use = \Junk }
+  mailbox Sent   { special_use = \Sent }
+  mailbox "Sent Messages" { special_use = \Sent }
+  mailbox Trash  { special_use = \Trash }
+}
+
+passdb {
+  args = scheme=SHA512-CRYPT username_format=%u /etc/dovecot/users
+  driver = passwd-file
+}
+
+service auth {
+  unix_listener /var/spool/postfix/private/auth {
+    group = postfix
+    mode = 0660
+    user = postfix
+  }
+  unix_listener auth-client { mode = 0660 }
+  unix_listener auth-userdb {
+    group = vmail
+    mode = 0660
+    user = vmail
+  }
+}
+
+service auth-worker { user = root }
+
+service lmtp {
+  unix_listener /var/spool/postfix/private/dovecot-lmtp {
+    group = postfix
+    mode = 0660
+    user = postfix
+  }
+}
+
+ssl = required
+ssl_cert = </etc/pki/dovecot/certs/dovecot.pem
+ssl_cipher_list = PROFILE=SYSTEM
+ssl_key = # hidden
+
+userdb {
+  args = username_format=%u /etc/dovecot/users
+  driver = passwd-file
+}
+```
+
+**`/etc/postfix/sasl_passwd`:**
+
+This file contains the SendGrid API key used only when `fallback_relay` activates. It must contain:
 
 ```
-3. **The Secret Vault:** /etc/postfix/sasl_passwd
-This file contains the "handshake" credentials for SendGrid.
-- **Action Required:**
-    - Must contain: [smtp.sendgrid.net]:587 apikey:SG.<REDACTED>
-    - **CRITICAL:** Must be compiled into LMDB format using: sudo postmap lmdv:/etc/postfix/sasl_passwd, every time the API key changes.
-    - Because of the information disclosure risk i will not be including the file.
- 
-4. **THe User Database:** /etc/dovecot/users
-This is the file the script mail-admin.sh manages, notes the permisisons and the setup these are virtual users.
-- **Format Check:**
-    - Each line must follow the user@domain:{HASH}:5000:5000::/path format.
-    - **Security:** Ensure it uses  {SHA512-CRYPT} to maintain the A+ security rathing.
+[smtp.sendgrid.net]:587 apikey:SG.<REDACTED>
+```
 
-5. **The Auth Bridge:** /etc/dovecot/conf.d/auth-passwdfile.conf.ext
-This file tells the Dovecot service how to read the users file mentioned above.
-- **Configuration Check:**
-    - passdb and userdb sections must both point to args = etc/dovecot/users.
-    - Without this file being correctly configured and included in 10-auth.conf, Dovecot won't know where to look for the users you add with the script.
+It must be compiled to LMDB format after every change:
 
----
+```bash
+sudo postmap lmdb:/etc/postfix/sasl_passwd
+sudo chmod 0600 /etc/postfix/sasl_passwd /etc/postfix/sasl_passwd.lmdb
+```
+
+The file is omitted from this document due to the information disclosure risk of exposing a live API key.
 
 ### 5.13 Verification
 
+**Port listening verification:**
+
+```bash
+sudo ss -tulpn | grep -E ':(465|587|993|25)'
+# Expected: 0.0.0.0:25, 0.0.0.0:465, 0.0.0.0:587, 0.0.0.0:993 (and IPv6 equivalents)
+```
+
 **IMAPS (Port 993):**
 
-![IMAPS from Rocky Linux](images/image30.png)
-*`openssl s_client -connect mail.gwallofchina.yulcyberhub.click:993 -quiet` from Rocky Linux — full chain ISRG Root X1 → E8 → domain. `* OK [...] Dovecot ready.`*
-
-![IMAPS from Kali](images/image6.png)
-*Same command from Kali — identical chain and Dovecot IMAP4rev1 banner. Cross-platform validation.*
+```bash
+openssl s_client -connect mail.gwallofchina.yulcyberhub.click:993 -quiet
+# Expected: full chain ISRG Root X1 → E8 → domain, "* OK [...] Dovecot ready."
+```
 
 **SMTPS (Port 465):**
 
-![SMTPS Port 465 from Rocky](images/image57.png)
-*`openssl s_client -connect mail.gwallofchina.yulcyberhub.click:465 -quiet` from Rocky Linux — full chain verified. `220 mail.gwallofchina.yulcyberhub.click ESMTP Postfix` banner.*
-
-![SMTPS Port 465 from Kali](images/image59.png)
-*Same from Kali — identical chain and `220 ESMTP Postfix` banner. Confirms port 465 serves correct implicit TLS from any external client.*
+```bash
+openssl s_client -connect mail.gwallofchina.yulcyberhub.click:465 -quiet
+# Expected: full chain, "220 mail.gwallofchina.yulcyberhub.click ESMTP Postfix"
+```
 
 **Mailbox verification commands:**
 
@@ -1976,38 +1661,39 @@ This file tells the Dovecot service how to read the users file mentioned above.
 | Check PM2 processes | `sudo /usr/local/bin/pm2 list` |
 | Check Node app logs | `sudo /usr/local/bin/pm2 logs webmail` |
 | Check MX record | `dig MX gwallofchina.yulcyberhub.click` |
-| List mailboxes | `sudo cat /etc/postfix/vmailbox` |
-| List Dovecot users | `sudo cat /etc/dovecot/users` |
-| Check mail folders | `sudo ls /var/mail/vhosts/gwallofchina.yulcyberhub.click/` |
 | Verify relay config | `postconf relayhost fallback_relay` |
+| Verify OpenDKIM | `sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv` |
+| MTA-STS policy | `curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt` |
 
-**End-to-End Mail Delivery:**
+**Final Deployment Status:**
 
-![AEC Final Audit Email](images/image1.png)
-*Gmail inbox — "AEC Final Audit" received from `admin@gwallofchina.yulcyberhub.click`. Confirms end-to-end mail delivery is operational and the domain identity is trusted by Google's mail infrastructure.*
+| Component | Status |
+|---|---|
+| Outbound mail — direct SMTP (primary) | Working (`relayhost =` empty · OpenDKIM signs · port 25 open) |
+| Outbound mail — SendGrid relay (fallback) | Configured (`fallback_relay = [smtp.sendgrid.net]:587`) |
+| Inbound mail — direct SMTP (port 25) | Working (MX → `mail.gwallofchina.yulcyberhub.click:25`) |
+| OpenDKIM local DKIM signing | Active (`s=mail` · `DKIM-Signature field added` confirmed in logs) |
+| SPF | Pass (`ip4:54.226.198.180 include:sendgrid.net mx ~all`) |
+| DKIM | Pass (direct: OpenDKIM `mail._domainkey` · fallback: SendGrid `s1/s2._domainkey`) |
+| DMARC | Pass (`p=reject` · both paths satisfy alignment) |
+| MTA-STS | Policy file live at `https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt` |
+| Port 25 (SMTP) | Listening — inbound + outbound |
+| Port 465 (SMTPS) | Listening — implicit TLS |
+| Port 587 (Submission) | Listening — STARTTLS |
+| Port 993 (IMAPS) | Listening — implicit TLS |
+| Dovecot IMAP | Working |
+| Webmail app | Live at `https://mail.gwallofchina.yulcyberhub.click` |
+| SSL certificate | Valid until 2026-07-02 (SAN: main + mail + mta-sts) |
+| Main website | Live at `https://gwallofchina.yulcyberhub.click` |
+| User mailboxes | pborelli, kbain, molivier, sroy |
+| DNSSEC | Fully validated (chain established · `ad` flag confirmed) |
 
-![Local Mail Delivery](images/image5.png)
-*Local delivery test: three messages in `/var/spool/mail/root`, `From: Cloud User <rocky@mail.gwallofchina.yulcyberhub.click>`. Postfix local transport confirmed.*
+**SSL Labs Final Summary:**
 
-**Receiving Mail Via Webmail App**
-![Local Mail Delivery](images/receiving_email_app.png)
-
-**Verifying DMARC, DKIM, SPF, MTA-STS:**
-![Local Mail Delivery](images/dmarc.png)
-
-![Local Mail Delivery](images/dkim.png)
-
-![Local Mail Delivery](images/mta_sts.png)
-
-![Local Mail Delivery](images/compliance.png)
-
-**SSL Labs A+ — Mail Server:**
-
-![SSL Labs A+ Mail Server](images/image39.png)
-*Qualys SSL Labs — `mail.gwallofchina.yulcyberhub.click` (54.226.198.180): **A+**. TLS 1.3, HSTS long-duration, CAA policy found. Certificate: EC 256 bits, SHA384withECDSA.*
-
-![SSL Labs A+ Mail — Detailed](images/image48.png)
-*Detailed SSL Labs mail report — identical A+ rating. Certificate fingerprint and SAN confirm shared cert with main domain. Certificate Transparency: Yes.*
+| Domain | Overall | Certificate | Protocol | Key Exchange | Cipher |
+|---|---|---|---|---|---|
+| `gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | 100 | 100 |
+| `mail.gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | ~90 | ~90 |
 
 ---
 
@@ -2015,39 +1701,23 @@ This file tells the Dovecot service how to read the users file mentioned above.
 
 ### 6.1 Security vs. Compatibility
 
-**Disabling TLS 1.0 / 1.1**
+**Disabling TLS 1.0 / 1.1** impacts ≤2% of clients (IE11 on Windows 7, unsupported since 2020). Accepted because the affected population runs unpatched software that presents greater ecosystem risk than the accessibility loss.
 
-Disabling legacy protocols impacts ≤2% of clients (IE11 on Windows 7, unsupported since 2020). Accepted because the affected population runs unpatched software that presents greater ecosystem risk than the accessibility loss.
+**CSP `unsafe-inline`** is required by the current page architecture. Planned migration to nonce-based CSP (`'nonce-{random}'`) will address this without breaking inline functionality.
 
-**CSP `unsafe-inline`**
-
-`style-src` and `script-src` include `'unsafe-inline'` — required by the current page architecture. Planned migration to nonce-based CSP (`'nonce-{random}'`) will address this without breaking inline functionality.
-
-**SSH Port 22**
-
-Open to `0.0.0.0/0` alongside the team IP for lab operational flexibility. Explicitly documented as a known limitation — production requires bastion-only restriction.
-
----
+**SSH Port 22** is open to `0.0.0.0/0` alongside the team IP for lab operational flexibility. Explicitly documented as a known limitation — production requires bastion-only restriction.
 
 ### 6.2 Performance Considerations
 
-**DH Parameter Generation:**
-4096-bit DH parameter generation takes 10–20 minutes on t4g.small — one-time cost, not per-connection. Security gain (Logjam mitigation) far outweighs the delay.
+**DH Parameter Generation:** 4096-bit DH parameter generation takes 10–20 minutes on t4g.small — one-time cost, not per-connection. Security gain (Logjam mitigation) far outweighs the delay.
 
-**TLS Session Cache:**
-10MB shared cache (~40,000 sessions) reduces handshake overhead on returning clients while `ssl_session_tickets off` preserves PFS.
+**TLS Session Cache:** 10MB shared cache (~40,000 sessions) reduces handshake overhead on returning clients while `ssl_session_tickets off` preserves PFS.
 
-**HTTP/2:**
-HPACK header compression and multiplexed requests reduce page load latency without security trade-offs. Confirmed: `[PASS] HTTP/2: active`.
+**HTTP/2:** HPACK header compression and multiplexed requests reduce page load latency without security trade-offs.
 
-**ChaCha20-Poly1305:**
-Included specifically for the ARM64 Graviton2 processor — on hardware without AES-NI, ChaCha20 outperforms AES-GCM in software. Both Nginx and Postfix benefit from this cipher being in the priority list.
-
----
+**ChaCha20-Poly1305:** Included specifically for the ARM64 Graviton2 processor — on hardware without AES-NI, ChaCha20 outperforms AES-GCM in software.
 
 ### 6.3 Testing & Troubleshooting
-
-**Issues Encountered and Resolutions:**
 
 | Issue | Root Cause | Resolution |
 |---|---|---|
@@ -2069,7 +1739,7 @@ Included specifically for the ARM64 Graviton2 processor — on hardware without 
 | `signing table references unknown key` | KeyTable file was empty — `tee` wrote entry to SigningTable instead | Rewrote both SigningTable and KeyTable with correct single-line entries |
 | `multiple DNS replies` for DKIM key | DNS record stored as 3 separate ResourceRecords instead of one value with quoted chunks | Deleted and recreated record as single value with space-separated quoted chunks |
 | `CharacterStringTooLong` when adding DKIM TXT | Full key exceeds 255-char DNS TXT string limit | Split key into multiple quoted chunks within a single ResourceRecord value |
-| SPF fail on direct-sent mail | Two conflicting SPF records (`v=spf1 -all` and correct record) | Deleted `v=spf1 -all` record; kept `v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all` |
+| SPF fail on direct-sent mail | Two conflicting SPF records | Deleted `v=spf1 -all` record; kept correct record |
 | Port 465 (SMTPS) not listening | `smtps` service missing from `master.cf` | Added `smtps inet n - n - - smtpd` block with `-o smtpd_tls_wrappermode=yes` |
 | `master.cf` sed corrupted submission block | `sed -i` merged multi-line block into one line | Rewrote `master.cf` manually with correct indentation for each `-o` option |
 | MTA-STS policy file missing | Policy file not created on server | Created `/var/www/mta-sts/.well-known/mta-sts.txt` and added Nginx virtual host |
@@ -2131,45 +1801,13 @@ sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
 
 # 15. Full auth verification (port25 auto-reply)
 echo "auth test" | mail -s "auth test" check-auth@verifier.port25.com
-# Check reply at https://mail.gwallofchina.yulcyberhub.click for SPF/DKIM/DMARC results
 
 # 16. MTA-STS policy file
 curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
 
 # 17. All ports listening
 sudo ss -tlnp | grep -E ':(25|465|587|993)'
-# Expected: all four ports listening
 ```
-
-**Final SSL Labs Summary:**
-
-| Domain | Overall | Certificate | Protocol | Key Exchange | Cipher |
-|---|---|---|---|---|---|
-| `gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | 100 | 100 |
-| `mail.gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | ~90 | ~90 |
-
-**Final Deployment Status:**
-
-| Component | Status |
-|---|---|
-| Outbound mail — direct SMTP (primary) | ✅ Working (`relayhost =` empty · OpenDKIM signs · port 25 open) |
-| Outbound mail — SendGrid relay (fallback) | ✅ Configured (`fallback_relay = [smtp.sendgrid.net]:587`) |
-| Inbound mail — direct SMTP (port 25) | ✅ Working (MX → `mail.gwallofchina.yulcyberhub.click:25`) |
-| OpenDKIM local DKIM signing | ✅ Active (`s=mail` · `DKIM-Signature field added` confirmed in logs) |
-| SPF | ✅ Pass (`ip4:54.226.198.180 include:sendgrid.net mx ~all`) |
-| DKIM | ✅ Pass (direct: OpenDKIM `mail._domainkey` · fallback: SendGrid `s1/s2._domainkey`) |
-| DMARC | ✅ Pass (`p=reject` · both paths satisfy alignment) |
-| MTA-STS | ✅ Policy file live at `https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt` |
-| Port 25 (SMTP) | ✅ Listening — inbound + outbound |
-| Port 465 (SMTPS) | ✅ Listening — implicit TLS |
-| Port 587 (Submission) | ✅ Listening — STARTTLS |
-| Port 993 (IMAPS) | ✅ Listening — implicit TLS |
-| Dovecot IMAP | ✅ Working |
-| Webmail app | ✅ Live at `https://mail.gwallofchina.yulcyberhub.click` |
-| SSL certificate | ✅ Valid until 2026-07-02 (SAN: main + mail + mta-sts) |
-| Main website | ✅ Live at `https://gwallofchina.yulcyberhub.click` |
-| User mailboxes | ✅ pborelli, kbain, molivier, sroy |
-| DNSSEC | ✅ Fully validated (chain established · `ad` flag confirmed) |
 
 ---
 
@@ -2212,18 +1850,5 @@ sudo ss -tlnp | grep -E ':(25|465|587|993)'
 
 ---
 
-*Next Review: 2026-06-25 (Quarterly Security Assessment)*  
+*Next Review: 2026-06-25 (Quarterly Security Assessment)*
 *Distribution: Cyber Defense Team · Operations Center · Compliance Office*
-
----
-
-![Built with](https://img.shields.io/badge/Built%20with-Rocky%20Linux-10B981?style=flat-square&logo=rockylinux)
-![Secured by](https://img.shields.io/badge/Secured%20by-Let's%20Encrypt-FF7700?style=flat-square&logo=letsencrypt)
-![Hosted on](https://img.shields.io/badge/Hosted%20on-AWS%20EC2-FF9900?style=flat-square&logo=amazonaws)
-![Audited by](https://img.shields.io/badge/Audited%20by-Lynis%203.1.2-blue?style=flat-square)
-![DNSSEC](https://img.shields.io/badge/DNSSEC-Fully%20Validated-purple?style=flat-square)
-![Screenshots](https://img.shields.io/badge/Screenshots-60%20embedded-lightgrey?style=flat-square)
-
-
-
-*"Security is not a product, but a process."* — Bruce Schneier
