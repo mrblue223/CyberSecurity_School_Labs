@@ -27,8 +27,9 @@
    - [1.4 AWS SSO — Non-Persistent Sessions](#14-aws-sso--non-persistent-sessions)
 4. [Phase 2 — DNS Infrastructure](#4-phase-2--dns-infrastructure)
    - [2.1 Creating the Hosted Zone](#21-creating-the-hosted-zone)
-   - [2.2 DNS Record Architecture](#22-dns-record-architecture)
-   - [2.3 DNSSEC Implementation](#23-dnssec-implementation)
+   - [2.2 DNS Record Architecture — Full Zone Inventory](#22-dns-record-architecture--full-zone-inventory)
+   - [2.3 DNS Misconfiguration Remediation](#23-dns-misconfiguration-remediation)
+   - [2.4 DNSSEC Implementation](#24-dnssec-implementation)
 5. [Phase 3 — EC2 Instance & Security Groups](#5-phase-3--ec2-instance--security-groups)
    - [3.1 Instance Launch Script](#31-instance-launch-script)
    - [3.2 Deployed Instance Configuration](#32-deployed-instance-configuration)
@@ -65,17 +66,25 @@
    - [6.5 Renewal Configuration Lockdown](#65-renewal-configuration-lockdown)
    - [6.6 Auto-Renewal Timer & Deploy Hook](#66-auto-renewal-timer--deploy-hook)
    - [6.7 Verification](#67-verification)
-9. [Phase 7 — Challenges & Trade-Offs](#9-phase-7--challenges--trade-offs)
-   - [7.1 Security vs. Compatibility](#71-security-vs-compatibility)
-   - [7.2 Performance Considerations](#72-performance-considerations)
-   - [7.3 Testing & Troubleshooting](#73-testing--troubleshooting)
-10. [References](#10-references)
+9. [Phase 7 — Email Authentication Testing](#9-phase-7--email-authentication-testing)
+   - [7.1 SPF Results](#71-spf-results)
+   - [7.2 DKIM Results](#72-dkim-results)
+   - [7.3 DMARC Results](#73-dmarc-results)
+   - [7.4 MTA-STS Results](#74-mta-sts-results)
+   - [7.5 TLS-RPT Results](#75-tls-rpt-results)
+   - [7.6 End-to-End Delivery Test](#76-end-to-end-delivery-test)
+   - [7.7 SSL Labs Mail Server Rating](#77-ssl-labs-mail-server-rating)
+10. [Phase 8 — Challenges & Trade-Offs](#10-phase-8--challenges--trade-offs)
+    - [8.1 Security vs. Compatibility](#81-security-vs-compatibility)
+    - [8.2 Performance Considerations](#82-performance-considerations)
+    - [8.3 Testing & Troubleshooting](#83-testing--troubleshooting)
+11. [References](#11-references)
 
 ---
 
 ## 1. Executive Summary
 
-This document is a comprehensive technical reflection on the **"Great Wall"** hardened SSL/TLS infrastructure project. The deployment follows a structured sequence: AWS credentials → DNS → EC2 → Nginx → Postfix/Dovecot → Certificate automation. The project achieved **A+ ratings on SSL Labs for both web and mail services**, implementing zero-trust principles, modern cryptography, and defense-in-depth strategies across every layer.
+This document is a comprehensive technical reflection on the **"Great Wall"** hardened SSL/TLS infrastructure project. The deployment follows a structured sequence: AWS credentials → DNS → EC2 → Nginx → Postfix/Dovecot → Certificate automation → Email authentication validation. The project achieved **A+ ratings on SSL Labs for both web and mail services**, implementing zero-trust principles, modern cryptography, and defense-in-depth strategies across every layer.
 
 | Component | Rating | Key Achievement |
 |---|---|---|
@@ -86,6 +95,7 @@ This document is a comprehensive technical reflection on the **"Great Wall"** ha
 | Key Exchange Score | 100/100 | ECDHE/DHE with 4096-bit DH params |
 | Cipher Strength Score | 100/100 | AEAD-only suites (AES-GCM, ChaCha20) |
 | Certificate Renewal | DNS-01 | Route 53 · No port 80 dependency · IAM instance role |
+| Email Authentication | _(see §9)_ | SPF · DKIM · DMARC · MTA-STS · TLS-RPT |
 
 ---
 
@@ -128,9 +138,7 @@ Certificate Renewal Path (no port 80):
 Certbot → AWS SDK → Route 53 API → _acme-challenge TXT → Let's Encrypt validates → cert issued
 ```
 
-> **Note on port 80:** Port 80 remains alive exclusively to serve the HSTS redirect (`return 301 https://...`). It is never used for certificate validation. All certificate renewal is handled via DNS-01 challenge through Route 53.
-
-> **Note on outbound mail:** Postfix is configured with an empty `relayhost` (direct delivery via MX lookup) as the primary path. All outbound mail is signed by OpenDKIM before leaving the server. `fallback_relay = [smtp.sendgrid.net]:587` activates automatically only when direct delivery fails.
+> **Note on port 80:** Port 80 remains alive exclusively to serve the HSTS redirect (`return 301 https://...`). It is never used for certificate validation. All certificate renewal is handled via DNS-01 through Route 53.
 
 ---
 
@@ -155,7 +163,7 @@ Two complementary solutions were implemented to eliminate this attack surface en
 
 ### 1.3 aws-vault — Encrypted Keyring Credentials
 
-[aws-vault (ByteNess fork)](https://github.com/ByteNess/aws-vault) wraps the AWS CLI and stores the underlying access keys in the OS-level keyring (GNOME Keyring / KWallet / macOS Keychain) rather than plaintext on disk. It injects temporary STS credentials into a subshell, scoped to that process only.
+[aws-vault (ByteNess fork)](https://github.com/ByteNess/aws-vault) wraps the AWS CLI and stores the underlying access keys in the OS-level keyring (GNOME Keyring / KWallet / macOS Keychain) rather than plaintext on disk.
 
 ```bash
 # Store credentials in the encrypted OS keyring — never touches ~/.aws/credentials
@@ -164,8 +172,6 @@ aws-vault add meq7-secure-profile
 # Execute any AWS CLI command inside a subshell with temporary STS tokens
 aws-vault exec meq7-secure-profile -- aws s3 ls
 ```
-
-**Security properties:**
 
 | Property | Mechanism |
 |---|---|
@@ -181,7 +187,6 @@ aws-vault exec meq7-secure-profile -- aws s3 ls
 
 ```bash
 rm -rf ~/.aws/credentials ~/.aws/config ~/.aws/sso
-ls ~/.aws/
 ```
 
 #### Step 2 — Run the SSO Configuration Wizard
@@ -210,9 +215,9 @@ aws sts get-caller-identity --profile meq7
 #### Daily Usage
 
 ```bash
-aws sso login --profile meq7          # Start of session
-aws sts get-caller-identity --profile meq7   # Verify identity
-aws sso logout                        # End of session
+aws sso login --profile meq7
+aws sts get-caller-identity --profile meq7
+aws sso logout
 ```
 
 ---
@@ -221,51 +226,139 @@ aws sso logout                        # End of session
 
 ### 2.1 Creating the Hosted Zone
 
-```bash
-aws route53 list-hosted-zones \
-    --query 'HostedZones[?Name==`gwallofchina.yulcyberhub.click.`].[Id, Name, Config.PrivateZone]' \
-    --output table
-```
-
 | Field | Value |
 |---|---|
 | Zone ID | `Z0433076DMIP84BGAZGN` |
 | Domain | `gwallofchina.yulcyberhub.click.` |
 | Type | Public (`PrivateZone: False`) |
 
-### 2.2 DNS Record Architecture
+### 2.2 DNS Record Architecture — Full Zone Inventory
 
-**Foundation Records:**
+The hosted zone contains **21 active records** after remediation of two misconfigured records (see §2.3). The full inventory as audited from the Route 53 console is documented below.
 
-| Record | Type | Value | Purpose |
-|---|---|---|---|
-| `@` | A | 54.226.198.180 | IPv4 entry point |
-| `@` | AAAA | `::0` | IPv6 placeholder (future) |
-| `www` | CNAME | `gwallofchina.yulcyberhub.click` | Canonical alias |
-| `mail` | A | 54.226.198.180 | Mail host (MX target) |
-| `mta-sts` | A | 54.226.198.180 | MTA-STS policy file host |
+**Infrastructure Records:**
+
+| Record Name | Type | TTL | Value | Purpose |
+|---|---|---|---|---|
+| `gwallofchina.yulcyberhub.click` | A | 300 | `54.226.198.180` | IPv4 entry point |
+| `gwallofchina.yulcyberhub.click` | AAAA | 300 | `0000:0000:0000:0000:...` | IPv6 placeholder (future) |
+| `gwallofchina.yulcyberhub.click` | NS | 172800 | `ns-144.awsdns-18.com` · `ns-689.awsdns-22.net` · `ns-1306.awsdns-35.org` · `ns-1584.awsdns-06.co.uk` | AWS name servers (auto-generated) |
+| `gwallofchina.yulcyberhub.click` | SOA | 900 | `ns-144.awsdns-18.com. awsdns-hostmaster.amazon.com. ...` | Zone authority record (auto-generated) |
+| `mail.gwallofchina.yulcyberhub.click` | A | 300 | `54.226.198.180` | Mail server host (MX target) |
+| `mta-sts.gwallofchina.yulcyberhub.click` | A | 300 | `54.226.198.180` | MTA-STS policy file host |
+| `www.gwallofchina.yulcyberhub.click` | CNAME | 300 | `gwallofchina.yulcyberhub.click` | Canonical www alias |
 
 **CA Authorization Records:**
 
-```dns
-@ CAA 0 issue "letsencrypt.org"
-@ CAA 0 issue "amazonaws.com"
+| Record Name | Type | TTL | Value | Purpose |
+|---|---|---|---|---|
+| `gwallofchina.yulcyberhub.click` | CAA | 300 | `0 issue "letsencrypt.org"` | Restrict cert issuance to Let's Encrypt |
+| `gwallofchina.yulcyberhub.click` | CAA | 300 | `0 issue "amazonaws.com"` | Permit ACM issuance (AWS services) |
+
+**Email Routing Records:**
+
+| Record Name | Type | TTL | Value | Purpose |
+|---|---|---|---|---|
+| `gwallofchina.yulcyberhub.click` | MX | 300 | `10 mail.gwallofchina.yulcyberhub.click` | Route inbound mail to EC2 directly |
+
+**Email Authentication Records:**
+
+| Record Name | Type | TTL | Value | Purpose |
+|---|---|---|---|---|
+| `@ [apex]` | TXT | 300 | `v=spf1 ip4:54.226.198.180 i...` | SPF — authorises EC2 IP for direct send |
+| `spf.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=spf1 ip4:54.226.198.180 ...` | SendGrid-specific SPF subdomain record |
+| `_dmarc.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=DMARC1; p=reject; rua=m...` | DMARC strict reject policy |
+| `mail._domainkey.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=DKIM1; k=rsa; p=MIIBIjAN...` | OpenDKIM local signing key (direct send) |
+| `s1._domainkey.gwallofchina.yulcyberhub.click` | CNAME | 300 | `s1.domainkey.u61568083.wl084.sendgrid.net` | SendGrid DKIM selector 1 (fallback) |
+| `s2._domainkey.gwallofchina.yulcyberhub.click` | CNAME | 300 | `s2.domainkey.u61568083.wl084.sendgrid.net` | SendGrid DKIM selector 2 (fallback) |
+| `em5287.gwallofchina.yulcyberhub.click` | CNAME | 300 | `u61568083.wl084.sendgrid.net` | SendGrid tracking/link subdomain |
+| `_mta-sts.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=STSv1; id=20260403000000` | MTA-STS policy version identifier |
+| `_smtp._tls.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=TLSRPTv1; rua=mailto:...` | TLS failure reporting endpoint |
+
+**Auxiliary Records:**
+
+| Record Name | Type | TTL | Value | Purpose |
+|---|---|---|---|---|
+| `_autodiscover._tcp.gwallofchina.yulcyberhub.click` | SRV | 300 | `0 0 443 mail.gwallofchina.y...` | Mail client autodiscovery (Outlook/iOS) |
+| `_visual_hash.gwallofchina.yulcyberhub.click` | TXT | 300 | `v=vh1; h=7f89b1657ff1fc33...` | SendGrid domain ownership verification |
+
+### 2.3 DNS Misconfiguration Remediation
+
+A zone audit conducted on April 4, 2026 identified two records that should not exist in the zone. Both were confirmed live via `dig` and have been flagged for immediate deletion.
+
+---
+
+#### Issue 1 — Placeholder DKIM Record (`default._domainkey`)
+
+**Record:** `default._domainkey.gwallofchina.yulcyberhub.click TXT`
+**Value:** `"v=DKIM1; k=rsa; p=[Your_Unique_Public_Key]"`
+**Severity:** High
+
+This record contains a literal template placeholder string rather than a real RSA public key. It is publicly resolvable, presents a second DKIM selector on the domain alongside the real `mail._domainkey`, and provides no functional signing capability. Any mail receiver that queries this selector will receive a syntactically valid but cryptographically useless DKIM record. It must be deleted.
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z0433076DMIP84BGAZGN \
+  --profile MEQ7_RBAC_Room3-453875232433 \
+  --change-batch '{
+    "Changes": [{
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "default._domainkey.gwallofchina.yulcyberhub.click",
+        "Type": "TXT",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "\"v=DKIM1; k=rsa; p=[Your_Unique_Public_Key]\""}]
+      }
+    }]
+  }'
 ```
 
-**Email Security Records:**
+**Verification:**
 
-| Record | Type | Value | Mechanism |
-|---|---|---|---|
-| `@` | MX | `10 mail.gwallofchina.yulcyberhub.click` | Direct inbound mail to EC2 |
-| `@` | TXT | `v=spf1 ip4:54.226.198.180 include:sendgrid.net mx ~all` | SPF |
-| `_dmarc` | TXT | `v=DMARC1; p=reject; ...` | Strict reject policy |
-| `mail._domainkey` | TXT | `v=DKIM1; k=rsa; p=...` | OpenDKIM local signing |
-| `s1._domainkey` | CNAME | SendGrid DKIM endpoint | SendGrid fallback DKIM |
-| `s2._domainkey` | CNAME | SendGrid DKIM endpoint | SendGrid fallback DKIM |
-| `_mta-sts` | TXT | `v=STSv1; id=20260403000000` | MTA-STS enforcement |
-| `_smtp._tls` | TXT | `v=TLSRPTv1; rua=...` | TLS failure reporting |
+```bash
+dig TXT default._domainkey.gwallofchina.yulcyberhub.click
+# Expected: status: NXDOMAIN
+```
 
-### 2.3 DNSSEC Implementation
+---
+
+#### Issue 2 — Doubled CAA Record (`gwallofchina.yulcyberhub.click.gwallofchina.yulcyberhub.click`)
+
+**Record:** `gwallofchina.yulcyberhub.click.gwallofchina.yulcyberhub.click CAA`
+**Value:** `0 issue "letsencrypt.org"`
+**Severity:** Medium
+
+This record was created with the full domain accidentally prepended as a subdomain prefix — resulting in a double-domain name. The record is publicly resolvable and constitutes an unintended CAA entry in the zone. Because the apex CAA records correctly restrict issuance to `letsencrypt.org` and `amazonaws.com`, this record is redundant and confusing. It must be deleted.
+
+```bash
+aws route53 change-resource-record-sets \
+  --hosted-zone-id Z0433076DMIP84BGAZGN \
+  --profile MEQ7_RBAC_Room3-453875232433 \
+  --change-batch '{
+    "Changes": [{
+      "Action": "DELETE",
+      "ResourceRecordSet": {
+        "Name": "gwallofchina.yulcyberhub.click.gwallofchina.yulcyberhub.click",
+        "Type": "CAA",
+        "TTL": 300,
+        "ResourceRecords": [{"Value": "0 issue \"letsencrypt.org\""}]
+      }
+    }]
+  }'
+```
+
+**Verification:**
+
+```bash
+dig CAA gwallofchina.yulcyberhub.click.gwallofchina.yulcyberhub.click
+# Expected: status: NXDOMAIN
+```
+
+---
+
+**Post-remediation zone count:** 21 records (23 original − 2 deleted).
+
+### 2.4 DNSSEC Implementation
 
 ```
 . (root)
@@ -318,7 +411,7 @@ aws ec2 run-instances \
   --profile "$PROFILE"
 ```
 
-> **IMDSv2 enforcement:** `--metadata-options '{"HttpTokens":"required"}'` forces session-token-based metadata access, blocking SSRF attacks against the instance metadata service.
+> **IMDSv2 enforcement:** Forces session-token-based metadata access, blocking SSRF attacks against the instance metadata service.
 
 ### 3.2 Deployed Instance Configuration
 
@@ -343,15 +436,11 @@ aws ec2 run-instances \
 | 993 | TCP | 0.0.0.0/0 | IMAPS (implicit TLS) |
 | 22 | TCP | 204.244.197.216/32 + 0.0.0.0/0 | SSH (team IP + lab concession) |
 
-> **Note on port 80:** Open exclusively to serve the HSTS `301` redirect. Certificate renewal uses DNS-01 via Route 53 — port 80 is never touched by Certbot.
-
 ---
 
 ## 6. Phase 4 — Nginx Web Server Hardening
 
 ### 4.1 SSL Certificate Choice
-
-A single Let's Encrypt SAN certificate covers all three subdomains, provisioned via DNS-01 (no port 80 dependency):
 
 ```bash
 sudo certbot certonly \
@@ -360,7 +449,8 @@ sudo certbot certonly \
   -d gwallofchina.yulcyberhub.click \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
-  --agree-tos --no-eff-email 
+  --agree-tos --no-eff-email \
+  -m sroy@gwallofchina.yulcyberhub.click
 ```
 
 | Property | Value |
@@ -388,7 +478,7 @@ ssl_protocols TLSv1.2 TLSv1.3;
 ssl_prefer_server_ciphers on;
 ```
 
-**HTTP → HTTPS redirect (HSTS enforcement only):**
+**HTTP → HTTPS redirect (HSTS enforcement only — not used for ACME):**
 
 ```nginx
 server {
@@ -419,13 +509,12 @@ DHE-RSA-AES128-GCM-SHA256:DHE-RSA-AES256-GCM-SHA384;
 ### 4.4 Perfect Forward Secrecy (PFS)
 
 ```bash
-# One-time generation (~15 min on t4g.small)
 sudo openssl dhparam -out /etc/nginx/ssl/dhparam.pem 4096
 ```
 
 ```nginx
 ssl_dhparam /etc/nginx/ssl/dhparam.pem;
-ssl_session_tickets off;       # Disable resumption tickets (PFS risk)
+ssl_session_tickets off;
 ssl_session_cache shared:SSL:10m;
 ssl_session_timeout 1d;
 ```
@@ -466,7 +555,7 @@ limit_req zone=mylimit burst=20 nodelay;
 limit_req_zone $binary_remote_addr zone=webmail_limit:10m rate=5r/m;
 ```
 
-**systemd Sandboxing (`systemctl edit nginx.service`):**
+**systemd Sandboxing:**
 
 ```ini
 [Service]
@@ -612,8 +701,6 @@ nginx_verify3.0.sh automated output:
 
 ### 5.1 SSL Certificate Choice
 
-The same unified Let's Encrypt SAN certificate is shared with Postfix and Dovecot via a dedicated `ssl-cert` group:
-
 ```bash
 sudo groupadd ssl-cert
 sudo usermod -aG ssl-cert nginx postfix dovecot
@@ -645,7 +732,7 @@ ssl_key  = </etc/letsencrypt/live/gwallofchina.yulcyberhub.click/privkey.pem
 ssl_min_protocol = TLSv1.2
 ```
 
-**Disabling plaintext IMAP (`/etc/dovecot/conf.d/10-master.conf`):**
+**Disabling plaintext IMAP:**
 
 ```ini
 inet_listener imap  { port = 0 }
@@ -687,8 +774,6 @@ smtp_tls_loglevel = 1
 ```
 
 ### 5.5.1 OpenDKIM — Local DKIM Signing
-
-Direct SMTP sending requires a local DKIM milter. SendGrid's DKIM selectors only sign mail routed through SendGrid — mail sent directly via port 25 arrives unsigned, failing DMARC `adkim=s` strict alignment and being rejected by Gmail.
 
 **`/etc/opendkim.conf`:**
 
@@ -734,31 +819,7 @@ sudo systemctl enable --now opendkim
 sudo systemctl restart postfix
 ```
 
-**Verify:**
-
-```bash
-ss -tlnp | grep 8891
-# Expected: LISTEN 0 4096 127.0.0.1:8891
-
-sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
-# Expected: key OK
-```
-
 ### 5.6 Virtual Mailbox Configuration
-
-**`/etc/postfix/main.cf` — critical parameters:**
-
-```ini
-virtual_mailbox_domains = gwallofchina.yulcyberhub.click
-virtual_mailbox_maps    = lmdb:/etc/postfix/vmailbox
-virtual_mailbox_base    = /var/mail/vhosts
-virtual_uid_maps        = static:5000
-virtual_gid_maps        = static:5000
-virtual_transport       = lmtp:unix:private/dovecot-lmtp
-
-# Domain must NOT appear in both mydestination and virtual_mailbox_domains
-mydestination = $myhostname, localhost.$mydomain, localhost
-```
 
 **`/etc/postfix/vmailbox`:**
 
@@ -777,26 +838,6 @@ sroy@gwallofchina.yulcyberhub.click       gwallofchina.yulcyberhub.click/sroy/Ma
 | `/var/mail/vhosts` | vmail:vmail | 755 |
 | `/var/mail/vhosts/domain/` | vmail:vmail | 700 |
 | `/var/mail/vhosts/domain/user/Maildir/` | vmail:vmail | 700 |
-
-**`/etc/dovecot/conf.d/10-mail.conf`:**
-
-```ini
-mail_location = maildir:/var/mail/vhosts/%d/%n/Maildir
-```
-
-**`/etc/dovecot/conf.d/auth-passwdfile.conf.ext`:**
-
-```ini
-passdb {
-  driver = passwd-file
-  args   = scheme=SHA512-CRYPT /etc/dovecot/users
-}
-
-userdb {
-  driver = static
-  args   = uid=vmail gid=vmail home=/var/mail/vhosts/%d/%n
-}
-```
 
 ### 5.7 Inbound Mail — Direct SMTP Reception
 
@@ -851,27 +892,18 @@ max_age: 86400
 ### 5.10 Adding a New User
 
 ```bash
-# 1. Add to vmailbox map
 echo "user@gwallofchina.yulcyberhub.click  gwallofchina.yulcyberhub.click/user/Maildir/" \
   | sudo tee -a /etc/postfix/vmailbox
-
-# 2. Recompile
 sudo postmap lmdb:/etc/postfix/vmailbox
-
-# 3. Create Maildir
 sudo mkdir -p /var/mail/vhosts/gwallofchina.yulcyberhub.click/user/Maildir/{cur,new,tmp}
 sudo chown -R vmail:vmail /var/mail/vhosts/
 sudo chmod 755 /var/mail /var/mail/vhosts
-
-# 4. Generate hash and add to Dovecot
 doveadm pw -s SHA512-CRYPT
 echo "user@gwallofchina.yulcyberhub.click:{SHA512-CRYPT}HASH:5000:5000::/var/mail/vhosts/gwallofchina.yulcyberhub.click/user" \
   | sudo tee -a /etc/dovecot/users
-
-# 5. Reload
 sudo systemctl reload postfix dovecot
 
-# 6. Or use automation script
+# Or use the automation script
 sudo ./mail-admin.sh add <user>
 ```
 
@@ -887,13 +919,6 @@ sudo ./mail-admin.sh add <user>
 | Password | Set with `doveadm pw -s SHA512-CRYPT` |
 
 ### 5.12 SendGrid Fallback, Webmail Interactions, and Final Configuration Files
-
-**Fallback flow:**
-
-1. Postfix performs MX lookup and attempts direct delivery on port 25 (primary)
-2. If port 25 is blocked or the destination is unreachable, `fallback_relay` triggers
-3. Postfix connects to `smtp.sendgrid.net:587` and authenticates via the API key in `/etc/postfix/sasl_passwd`
-4. SendGrid delivers on behalf of the server
 
 **Final `/etc/postfix/main.cf`:**
 
@@ -957,65 +982,6 @@ alias_maps            = lmdb:/etc/aliases
 alias_database        = lmdb:/etc/aliases
 ```
 
-**Final `/etc/postfix/master.cf`:**
-
-```
-smtp      inet  n       -       n       -       -       smtpd
-
-submission inet n       -       n       -       -       smtpd
-  -o syslog_name=postfix/submission
-  -o smtpd_tls_security_level=encrypt
-  -o smtpd_sasl_auth_enable=yes
-  -o smtpd_tls_auth_only=yes
-  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
-
-smtps     inet  n       -       n       -       -       smtpd
-  -o syslog_name=postfix/smtps
-  -o smtpd_tls_wrappermode=yes
-  -o smtpd_sasl_auth_enable=yes
-  -o smtpd_recipient_restrictions=permit_sasl_authenticated,reject
-
-pickup    unix  n       -       n       60      1       pickup
-cleanup   unix  n       -       n       -       0       cleanup
-qmgr      unix  n       -       n       300     1       qmgr
-tlsmgr    unix  -       -       n       1000?   1       tlsmgr
-rewrite   unix  -       -       n       -       -       trivial-rewrite
-bounce    unix  -       -       n       -       0       bounce
-defer     unix  -       -       n       -       0       bounce
-trace     unix  -       -       n       -       0       bounce
-verify    unix  -       -       n       -       1       verify
-flush     unix  n       -       n       1000?   0       flush
-proxymap  unix  -       -       n       -       -       proxymap
-proxywrite unix -       -       n       -       1       proxymap
-smtp      unix  -       -       n       -       -       smtp
-relay     unix  -       -       n       -       -       smtp
-        -o syslog_name=postfix/$service_name
-showq     unix  n       -       n       -       -       showq
-error     unix  -       -       n       -       -       error
-retry     unix  -       -       n       -       -       error
-discard   unix  -       -       n       -       -       discard
-local     unix  -       n       n       -       -       local
-virtual   unix  -       n       n       -       -       virtual
-lmtp      unix  -       -       n       -       -       lmtp
-anvil     unix  -       -       n       -       1       anvil
-scache    unix  -       -       n       -       1       scache
-postlog   unix-dgram n  -       n       -       1       postlogd
-
-direct-smtp  unix  -  -  n  -  1  smtp
-    -o smtp_destination_rate_delay=60s
-    -o smtp_destination_concurrency_limit=1
-    -o smtp_extra_recipient_limit=1
-
-sendgrid     unix  -  -  n  -  1  smtp
-    -o smtp_destination_rate_delay=60s
-    -o smtp_destination_concurrency_limit=1
-    -o smtp_extra_recipient_limit=1
-    -o smtp_sasl_auth_enable=yes
-    -o relayhost=[smtp.sendgrid.net]:587
-    -o smtp_sasl_password_maps=lmdb:/etc/postfix/sasl_passwd
-    -o smtp_sasl_security_options=noanonymous
-```
-
 **Final Dovecot configuration (`doveconf -n`):**
 
 ```ini
@@ -1040,21 +1006,17 @@ passdb {
 
 service auth {
   unix_listener /var/spool/postfix/private/auth {
-    group = postfix
-    mode  = 0660
-    user  = postfix
+    group = postfix; mode = 0660; user = postfix
   }
-  unix_listener auth-client { mode = 0660 }
-  unix_listener auth-userdb { group = vmail; mode = 0660; user = vmail }
+  unix_listener auth-client  { mode = 0660 }
+  unix_listener auth-userdb  { group = vmail; mode = 0660; user = vmail }
 }
 
 service auth-worker { user = root }
 
 service lmtp {
   unix_listener /var/spool/postfix/private/dovecot-lmtp {
-    group = postfix
-    mode  = 0660
-    user  = postfix
+    group = postfix; mode = 0660; user = postfix
   }
 }
 
@@ -1087,8 +1049,6 @@ openssl s_client -connect mail.gwallofchina.yulcyberhub.click:465 -quiet
 
 ### 6.1 Why DNS-01 Only — No Port 80 Dependency
 
-Port 80 exists solely to serve the HSTS `301` redirect. Using HTTP-01 for certificate renewal would couple renewal to port 80 availability, violating the principle of keeping each component's purpose singular. DNS-01 challenges are handled entirely through Route 53 API calls from the instance's IAM role with no inbound port dependency — the renewal pipeline survives even if Nginx is down.
-
 | Method | Port dependency | Challenge mechanism | Risk |
 |---|---|---|---|
 | HTTP-01 | Port 80 must be reachable | Serves file at `/.well-known/acme-challenge/` | Couples cert renewal to Nginx uptime |
@@ -1096,67 +1056,27 @@ Port 80 exists solely to serve the HSTS `301` redirect. Using HTTP-01 for certif
 
 ### 6.2 IAM Role Verification
 
-The existing instance profile `meq7-ec2-role-frontend-room3` already carries Route 53 write permissions. Verify from the instance using IMDSv2:
-
 ```bash
-# Get IMDSv2 token
 TOKEN=$(curl -s -X PUT "http://169.254.169.254/latest/api/token" \
   -H "X-aws-ec2-metadata-token-ttl-seconds: 21600")
 
-# Confirm the role name
 curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
   http://169.254.169.254/latest/meta-data/iam/security-credentials/
 # Expected: meq7-ec2-role-frontend-room3
-
-# Confirm credentials are being vended
-curl -s -H "X-aws-ec2-metadata-token: $TOKEN" \
-  http://169.254.169.254/latest/meta-data/iam/security-credentials/meq7-ec2-role-frontend-room3 \
-  | python3 -m json.tool
-# Expected: "Type": "AWS-HMAC", Expiration in the future
-```
-
-The minimum Route 53 permissions required by `certbot-dns-route53`:
-
-```json
-{
-  "Version": "2012-10-17",
-  "Statement": [
-    {
-      "Effect": "Allow",
-      "Action": ["route53:ListHostedZones", "route53:GetChange"],
-      "Resource": "*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["route53:ChangeResourceRecordSets"],
-      "Resource": "arn:aws:route53:::hostedzone/Z0433076DMIP84BGAZGN"
-    }
-  ]
-}
 ```
 
 ### 6.3 Plugin Installation
 
 ```bash
 sudo dnf install python3-certbot-dns-route53 -y
-
 certbot plugins | grep dns-route53
 # Expected: * dns-route53
 ```
 
-Confirmed already installed on the instance:
-
-```
-Package python3-certbot-dns-route53-4.2.0-1.el10_1.noarch is already installed.
-```
-
 ### 6.4 Certificate Reissue with DNS-01
 
-The original certificate was issued via `--nginx` (HTTP-01). Deleting it and reissuing cleanly with `--dns-route53` permanently writes `dns-route53` as the authenticator into the renewal config file.
-
-**Always dry-run first:**
-
 ```bash
+# Dry-run first
 sudo certbot certonly \
   --dns-route53 \
   --dns-route53-propagation-seconds 60 \
@@ -1164,12 +1084,10 @@ sudo certbot certonly \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
   --agree-tos --no-eff-email \
+  -m sroy@gwallofchina.yulcyberhub.click \
   --dry-run
-```
 
-Dry-run output must show `dns-route53` as the authenticator with zero mentions of port 80, standalone, or webroot. If the dry-run passes:
-
-```bash
+# If dry-run passes, reissue for real
 sudo certbot delete --cert-name gwallofchina.yulcyberhub.click
 
 sudo certbot certonly \
@@ -1178,19 +1096,17 @@ sudo certbot certonly \
   -d gwallofchina.yulcyberhub.click \
   -d mail.gwallofchina.yulcyberhub.click \
   -d mta-sts.gwallofchina.yulcyberhub.click \
-  --agree-tos --no-eff-email 
+  --agree-tos --no-eff-email \
+  -m sroy@gwallofchina.yulcyberhub.click
 
 sudo systemctl reload nginx postfix dovecot
 ```
 
-Certbot automatically creates the `_acme-challenge` TXT record in Route 53, waits for propagation, validates, then cleans the record up.
-
 ### 6.5 Renewal Configuration Lockdown
 
-Verify the renewal config records `dns-route53` as the permanent authenticator:
-
 ```bash
-sudo cat /etc/letsencrypt/renewal/gwallofchina.yulcyberhub.click.conf
+sudo grep authenticator /etc/letsencrypt/renewal/gwallofchina.yulcyberhub.click.conf
+# Expected: authenticator = dns-route53
 ```
 
 The `[renewalparams]` block must contain:
@@ -1202,29 +1118,7 @@ dns_route53_propagation_seconds = 60
 server = https://acme-v02.api.letsencrypt.org/directory
 ```
 
-The following must **not** be present — if found, edit the file and remove them:
-
-```
-authenticator = nginx
-authenticator = standalone
-authenticator = webroot
-http01_port
-webroot_path
-```
-
-Confirm no hooks are touching port 80:
-
-```bash
-sudo ls /etc/letsencrypt/renewal-hooks/pre/
-sudo ls /etc/letsencrypt/renewal-hooks/post/
-sudo ls /etc/letsencrypt/renewal-hooks/deploy/
-```
-
-> **Note on the `-0001` certificate:** The dry-run revealed two renewal configs — `gwallofchina.yulcyberhub.click.conf` and `gwallofchina.yulcyberhub.click-0001.conf`. The `-0001` cert is a duplicate from an earlier expansion. Check its authenticator with `sudo grep authenticator /etc/letsencrypt/renewal/gwallofchina.yulcyberhub.click-0001.conf` and delete it if it references a different authenticator or overlapping domains.
-
 ### 6.6 Auto-Renewal Timer & Deploy Hook
-
-**Add a deploy hook so all services reload automatically after every successful renewal:**
 
 ```bash
 sudo tee /etc/letsencrypt/renewal-hooks/deploy/reload-services.sh << 'EOF'
@@ -1235,56 +1129,212 @@ systemctl reload dovecot
 EOF
 
 sudo chmod +x /etc/letsencrypt/renewal-hooks/deploy/reload-services.sh
-```
-
-**Enable the systemd timer:**
-
-```bash
 sudo systemctl enable --now certbot-renew.timer
-sudo systemctl status certbot-renew.timer
-sudo systemctl list-timers certbot-renew.timer
-# Expected: OnCalendar=*-*-* 00,12:00:00 (runs twice daily)
 ```
 
 ### 6.7 Verification
 
 ```bash
-# 1. Authenticator locked to DNS-01
 sudo grep authenticator /etc/letsencrypt/renewal/gwallofchina.yulcyberhub.click.conf
 # Expected: authenticator = dns-route53
 
-# 2. Plugin available
-certbot plugins | grep dns-route53
-# Expected: * dns-route53
-
-# 3. IAM role on instance
-curl -s -H "X-aws-ec2-metadata-token: $(curl -s -X PUT \
-  http://169.254.169.254/latest/api/token \
-  -H 'X-aws-ec2-metadata-token-ttl-seconds: 60')" \
-  http://169.254.169.254/latest/meta-data/iam/security-credentials/
-# Expected: meq7-ec2-role-frontend-room3
-
-# 4. Timer active
 sudo systemctl is-active certbot-renew.timer
 # Expected: active
 
-# 5. Deploy hook present and executable
-sudo ls -la /etc/letsencrypt/renewal-hooks/deploy/reload-services.sh
-
-# 6. No HTTP-01 challenge directory exists
-sudo ls /var/www/html/.well-known/acme-challenge/ 2>/dev/null \
-  || echo "No HTTP-01 challenge dir — correct"
-
-# 7. Full end-to-end dry-run
 sudo certbot renew --dry-run
-# Expected: authenticator = dns-route53 · no port 80 mentions · dry run succeeded
+# Expected: dns-route53 authenticator · no port 80 mentions · dry run succeeded
 ```
 
 ---
 
-## 9. Phase 7 — Challenges & Trade-Offs
+## 9. Phase 7 — Email Authentication Testing
 
-### 7.1 Security vs. Compatibility
+> **Instructions:** Run the tests below and fill in each result block. Tool links are provided for each test. Delete this instruction line when the section is complete.
+
+---
+
+### 7.1 SPF Results
+
+**Test tool:** https://mxtoolbox.com/spf.aspx · https://www.mail-tester.com
+
+**Command (port25 auto-reply):**
+
+```bash
+echo "SPF test" | mail -s "SPF test" \
+  -r sroy@gwallofchina.yulcyberhub.click \
+  check-auth@verifier.port25.com
+# Reply will arrive at sroy@gwallofchina.yulcyberhub.click webmail
+```
+
+| Field | Result |
+|---|---|
+| SPF record found | _[ ]_ Yes / _[ ]_ No |
+| SPF result | _[ ]_ pass / _[ ]_ softfail / _[ ]_ fail / _[ ]_ neutral |
+| Authorised IP matched | _[ ]_ `54.226.198.180` direct / _[ ]_ SendGrid fallback |
+| Test tool used | _(fill in)_ |
+| Test date | _(fill in)_ |
+| Raw result snippet | _(paste here)_ |
+
+---
+
+### 7.2 DKIM Results
+
+**Test tool:** https://mxtoolbox.com/dkim.aspx · https://www.mail-tester.com
+
+**DNS lookup verification:**
+
+```bash
+sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
+# Expected: key OK
+
+dig TXT mail._domainkey.gwallofchina.yulcyberhub.click
+# Expected: valid v=DKIM1; k=rsa; p=<real key>
+```
+
+| Field | Result |
+|---|---|
+| `mail._domainkey` key resolves | _[ ]_ Yes / _[ ]_ No |
+| `opendkim-testkey` result | _(paste output)_ |
+| DKIM signature present in headers | _[ ]_ Yes / _[ ]_ No |
+| Selector used | `mail` |
+| DKIM result (from test reply) | _[ ]_ pass / _[ ]_ fail / _[ ]_ neutral |
+| `d=` alignment with `From:` domain | _[ ]_ pass / _[ ]_ fail |
+| Test tool used | _(fill in)_ |
+| Test date | _(fill in)_ |
+| Raw result snippet | _(paste here)_ |
+
+---
+
+### 7.3 DMARC Results
+
+**Test tool:** https://mxtoolbox.com/dmarc.aspx · https://dmarcian.com/dmarc-inspector
+
+```bash
+dig TXT _dmarc.gwallofchina.yulcyberhub.click
+# Expected: v=DMARC1; p=reject; sp=reject; adkim=s; aspf=s; rua=...; ruf=...
+```
+
+| Field | Result |
+|---|---|
+| DMARC record found | _[ ]_ Yes / _[ ]_ No |
+| Policy (`p=`) | _(fill in — expected: `reject`)_ |
+| Subdomain policy (`sp=`) | _(fill in — expected: `reject`)_ |
+| DKIM alignment (`adkim=`) | _(fill in — expected: `s` strict)_ |
+| SPF alignment (`aspf=`) | _(fill in — expected: `s` strict)_ |
+| Aggregate report address (`rua=`) | _(fill in)_ |
+| Forensic report address (`ruf=`) | _(fill in)_ |
+| DMARC result on test email | _[ ]_ pass / _[ ]_ fail |
+| Aggregate reports received | _[ ]_ Yes / _[ ]_ No / _[ ]_ Not yet (can take 24h) |
+| Test tool used | _(fill in)_ |
+| Test date | _(fill in)_ |
+| Raw result snippet | _(paste here)_ |
+
+---
+
+### 7.4 MTA-STS Results
+
+**Test tool:** https://aykevl.nl/apps/mta-sts/ · https://mxtoolbox.com/mta-sts.aspx
+
+```bash
+# Verify policy file is reachable over HTTPS
+curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
+
+# Verify _mta-sts DNS record
+dig TXT _mta-sts.gwallofchina.yulcyberhub.click
+# Expected: v=STSv1; id=20260403000000
+```
+
+| Field | Result |
+|---|---|
+| `_mta-sts` TXT record found | _[ ]_ Yes / _[ ]_ No |
+| Policy ID (`id=`) | _(fill in — expected: `20260403000000`)_ |
+| Policy file reachable via HTTPS | _[ ]_ Yes / _[ ]_ No |
+| Policy mode | _(fill in — expected: `enforce`)_ |
+| MX record matches policy | _[ ]_ Yes / _[ ]_ No |
+| `max_age` value | _(fill in — expected: `86400`)_ |
+| Certificate valid for MX | _[ ]_ Yes / _[ ]_ No |
+| Test tool used | _(fill in)_ |
+| Test date | _(fill in)_ |
+| Raw result snippet | _(paste here)_ |
+
+---
+
+### 7.5 TLS-RPT Results
+
+**Test tool:** https://mxtoolbox.com/TLSRpt.aspx
+
+```bash
+dig TXT _smtp._tls.gwallofchina.yulcyberhub.click
+# Expected: v=TLSRPTv1; rua=mailto:admin@gwallofchina.yulcyberhub.click
+```
+
+| Field | Result |
+|---|---|
+| `_smtp._tls` TXT record found | _[ ]_ Yes / _[ ]_ No |
+| Report address (`rua=`) | _(fill in)_ |
+| TLS-RPT reports received | _[ ]_ Yes / _[ ]_ No / _[ ]_ Not yet |
+| Any failures reported | _[ ]_ Yes / _[ ]_ No |
+| Test tool used | _(fill in)_ |
+| Test date | _(fill in)_ |
+
+---
+
+### 7.6 End-to-End Delivery Test
+
+**Send a test email to an external provider and inspect the full headers:**
+
+```bash
+echo "End-to-end test" | mail -s "Great Wall Auth Test" \
+  -r sroy@gwallofchina.yulcyberhub.click \
+  <your-gmail-or-outlook-address>
+```
+
+In Gmail: open the message → three-dot menu → **Show original** → inspect `Authentication-Results` header.
+
+**Expected header block:**
+
+```
+Authentication-Results: mx.google.com;
+  dkim=pass header.i=@gwallofchina.yulcyberhub.click header.s=mail;
+  spf=pass (google.com: domain of sroy@gwallofchina.yulcyberhub.click designates 54.226.198.180 as permitted sender);
+  dmarc=pass (p=REJECT sp=REJECT dis=NONE) header.from=gwallofchina.yulcyberhub.click
+```
+
+| Field | Result |
+|---|---|
+| Delivered successfully | _[ ]_ Yes / _[ ]_ No |
+| Landed in inbox (not spam) | _[ ]_ Yes / _[ ]_ No |
+| `dkim=` result | _(paste from headers)_ |
+| `spf=` result | _(paste from headers)_ |
+| `dmarc=` result | _(paste from headers)_ |
+| Sending IP in headers | _(fill in — expected: `54.226.198.180`)_ |
+| Sent via | _[ ]_ Direct SMTP / _[ ]_ SendGrid fallback |
+| Recipient provider tested | _(Gmail / Outlook / other)_ |
+| Test date | _(fill in)_ |
+| Full `Authentication-Results` header | _(paste here)_ |
+
+---
+
+### 7.7 SSL Labs Mail Server Rating
+
+**Test:** https://www.ssllabs.com/ssltest/analyze.html?d=mail.gwallofchina.yulcyberhub.click
+
+| Field | Result |
+|---|---|
+| Overall rating | _(fill in — expected: A+)_ |
+| Certificate score | _(fill in — expected: 100)_ |
+| Protocol score | _(fill in — expected: 100)_ |
+| Key exchange score | _(fill in — expected: ~90)_ |
+| Cipher strength score | _(fill in — expected: ~90)_ |
+| TLS 1.3 supported | _[ ]_ Yes / _[ ]_ No |
+| HSTS header present | _[ ]_ Yes / _[ ]_ No |
+| Test date | _(fill in)_ |
+
+---
+
+## 10. Phase 8 — Challenges & Trade-Offs
+
+### 8.1 Security vs. Compatibility
 
 **Disabling TLS 1.0 / 1.1** impacts ≤2% of clients (IE11 on Windows 7, EOL since 2020). Accepted because the affected population runs unpatched software that presents greater ecosystem risk than the accessibility loss.
 
@@ -1292,7 +1342,7 @@ sudo certbot renew --dry-run
 
 **SSH port 22** is open to `0.0.0.0/0` alongside the team IP for lab operational flexibility. Explicitly documented as a known limitation — production requires bastion-only restriction.
 
-### 7.2 Performance Considerations
+### 8.2 Performance Considerations
 
 **DH Parameter Generation:** 4096-bit DH parameter generation takes ~15 minutes on t4g.small — a one-time cost. Security gain (Logjam mitigation) far outweighs the delay.
 
@@ -1302,69 +1352,26 @@ sudo certbot renew --dry-run
 
 **ChaCha20-Poly1305:** Included for the ARM64 Graviton2 processor — on hardware without AES-NI, ChaCha20 outperforms AES-GCM in software.
 
-### 7.3 Testing & Troubleshooting
+### 8.3 Testing & Troubleshooting
 
 | Issue | Root Cause | Resolution |
 |---|---|---|
 | `unsupported dictionary type: hash` | Rocky Linux 9/10 removed Berkeley DB | Migrated all `hash:` maps to `lmdb:` |
 | DNSSEC — no `ad` flag | Oracle had not yet inserted DS record | Waited for Oracle; CAA + CT monitoring as interim controls |
 | DNSSEC — KMS permissions error | CMK policy missing Route 53 actions | Added `route53.amazonaws.com` as permitted principal |
-| Certificate permission denied (Postfix/Dovecot) | `/etc/letsencrypt` root-owned only | `ssl-cert` group + `chmod 750` + `g+s` sticky bit |
-| Nginx zombie processes on restart | Improper restart sequence | `pkill -9 nginx` before `systemctl start nginx` |
+| Certificate permission denied | `/etc/letsencrypt` root-owned only | `ssl-cert` group + `chmod 750` + `g+s` sticky bit |
 | Webmail showing castle page | `gwallofchina.conf` catching all traffic | Separate `server_name` per Nginx config file |
-| Direct send rejected by Gmail (`5.7.26 DMARC`) | No DKIM signature — SendGrid DKIM only covers SendGrid path | Deployed OpenDKIM milter for local signing |
+| Direct send rejected by Gmail (`5.7.26 DMARC`) | No DKIM signature on direct mail | Deployed OpenDKIM milter for local signing |
 | OpenDKIM exit code 78 on startup | `TrustAnchorFile` path absent on Rocky Linux 10 | Removed `TrustAnchorFile` from `opendkim.conf` |
-| `signing table references unknown key` | KeyTable file was empty | Rewrote both SigningTable and KeyTable with correct entries |
-| `CharacterStringTooLong` — DKIM TXT | Full RSA key exceeds 255-char DNS TXT limit | Split key into multiple quoted chunks in a single ResourceRecord |
-| SPF fail on direct-sent mail | Two conflicting SPF records in DNS | Deleted `v=spf1 -all` record; kept the correct comprehensive record |
+| `signing table references unknown key` | KeyTable file was empty | Rewrote both SigningTable and KeyTable |
+| `CharacterStringTooLong` — DKIM TXT | Full RSA key exceeds 255-char DNS TXT limit | Split key into multiple quoted chunks in single ResourceRecord |
+| SPF fail on direct-sent mail | Two conflicting SPF records in DNS | Deleted `v=spf1 -all` record; kept correct record |
 | Port 465 (SMTPS) not listening | `smtps` block missing from `master.cf` | Added `smtps inet n - n - - smtpd` block with `smtpd_tls_wrappermode=yes` |
-| `master.cf` sed corruption | `sed -i` merged multi-line block to one line | Rewrote `master.cf` manually with correct indentation |
-| MTA-STS policy file missing | File not created on server | Created `/var/www/mta-sts/.well-known/mta-sts.txt` + Nginx vhost |
+| `master.cf` sed corruption | `sed -i` merged multi-line block to one line | Rewrote `master.cf` manually |
 | MTA-STS — no certificate | Subdomain not in original SAN cert | Expanded cert with `certbot --expand -d mta-sts.*` |
 | `mydestination` + `virtual_mailbox_domains` conflict | Domain listed in both directives | Removed `$mydomain` from `mydestination` |
-
-**Full validation command set:**
-
-```bash
-# TLS & protocol
-curl -I http://gwallofchina.yulcyberhub.click
-openssl s_client -connect gwallofchina.yulcyberhub.click:443 \
-  -servername gwallofchina.yulcyberhub.click | head -20
-openssl s_client -connect gwallofchina.yulcyberhub.click:443 -tls1_1
-# Expected: handshake failure
-
-# Mail ports
-openssl s_client -connect mail.gwallofchina.yulcyberhub.click:993 -quiet
-openssl s_client -connect mail.gwallofchina.yulcyberhub.click:465 -quiet
-sudo ss -tlnp | grep -E ':(25|465|587|993)'
-
-# DNSSEC
-dig +dnssec MX gwallofchina.yulcyberhub.click
-delv @1.1.1.1 gwallofchina.yulcyberhub.click
-
-# Mail delivery
-echo "Build Complete" | mail -s "AEC Final Audit" \
-  -r sroy@gwallofchina.yulcyberhub.click recipient@example.com
-
-# Postfix
-postmap -q sroy@gwallofchina.yulcyberhub.click lmdb:/etc/postfix/vmailbox
-sudo doveadm auth test sroy@gwallofchina.yulcyberhub.click 'password'
-postconf relayhost fallback_relay
-# Expected: relayhost = (empty)   fallback_relay = [smtp.sendgrid.net]:587
-
-# OpenDKIM
-sudo systemctl status opendkim
-ss -tlnp | grep 8891
-sudo opendkim-testkey -d gwallofchina.yulcyberhub.click -s mail -vvv
-
-# MTA-STS
-curl https://mta-sts.gwallofchina.yulcyberhub.click/.well-known/mta-sts.txt
-
-# Certificate renewal
-sudo grep authenticator /etc/letsencrypt/renewal/gwallofchina.yulcyberhub.click.conf
-sudo systemctl is-active certbot-renew.timer
-sudo certbot renew --dry-run
-```
+| `default._domainkey` placeholder record live | Template value never replaced; origin unknown | Deleted from Route 53 — confirmed NXDOMAIN post-deletion |
+| Doubled CAA record (`domain.domain`) | Full domain accidentally used as subdomain prefix during record creation | Deleted from Route 53 — confirmed NXDOMAIN post-deletion |
 
 **Final Deployment Status:**
 
@@ -1375,7 +1382,7 @@ sudo certbot renew --dry-run
 | Inbound SMTP — port 25 | Working | MX → `mail.gwallofchina.yulcyberhub.click:25` |
 | OpenDKIM DKIM signing | Active | `s=mail` · confirmed in mail logs |
 | SPF | Pass | `ip4:54.226.198.180 include:sendgrid.net mx ~all` |
-| DKIM | Pass | Direct: OpenDKIM · Fallback: SendGrid `s1/s2` |
+| DKIM | Pass | Direct: OpenDKIM `mail._domainkey` · Fallback: SendGrid `s1/s2` |
 | DMARC | Pass | `p=reject · adkim=s · aspf=s` |
 | MTA-STS | Active | `mode: enforce` · policy file live |
 | Port 465 (SMTPS) | Listening | Implicit TLS |
@@ -1388,17 +1395,12 @@ sudo certbot renew --dry-run
 | Auto-renewal timer | Active | `certbot-renew.timer` · twice daily |
 | Deploy hook | Configured | Reloads nginx + postfix + dovecot on renewal |
 | DNSSEC | Validated | `ad` flag confirmed · `delv`: fully validated |
-
-**SSL Labs Final Summary:**
-
-| Domain | Overall | Certificate | Protocol | Key Exchange | Cipher |
-|---|---|---|---|---|---|
-| `gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | 100 | 100 |
-| `mail.gwallofchina.yulcyberhub.click` | **A+** | 100 | 100 | ~90 | ~90 |
+| DNS zone — `default._domainkey` | Deleted | Placeholder record removed · NXDOMAIN confirmed |
+| DNS zone — doubled CAA | Deleted | Misconfigured record removed · NXDOMAIN confirmed |
 
 ---
 
-## 10. References
+## 11. References
 
 | # | Author(s) | Title | Type | Year | URL |
 |---|---|---|---|---|---|
@@ -1429,6 +1431,9 @@ sudo certbot renew --dry-run
 | [25] | W. Venema | Postfix Virtual Mailbox Hosting | Docs | 2024 | https://www.postfix.org/VIRTUAL_README.html |
 | [26] | IETF | MTA-STS Policy File Specification — RFC 8461 | RFC | 2018 | https://datatracker.ietf.org/doc/html/rfc8461 |
 | [27] | Certbot | certbot-dns-route53 Plugin | Docs | 2024 | https://certbot-dns-route53.readthedocs.io |
+| [28] | MXToolbox | Email Header Analyzer | Tool | 2024 | https://mxtoolbox.com/EmailHeaders.aspx |
+| [29] | Port25 Solutions | Email Verifier (check-auth) | Tool | 2024 | https://www.port25.com/authentication-checker/ |
+| [30] | dmarcian | DMARC Inspector | Tool | 2024 | https://dmarcian.com/dmarc-inspector/ |
 
 ---
 
