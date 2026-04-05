@@ -9,7 +9,7 @@
 
 | Team Member | Role | Key Contributions |
 |---|---|---|
-| **Sammy Roy** | Infrastructure Lead | SSL/TLS configuration (Nginx + Postfix/Dovecot) · DNSSEC implementation & setup (KMS CMK, KSK, zone signing) · DNS record architecture · Certificate hardening · Security headers · Cipher suite selection · DNS-01 renewal pipeline · Automated verification scripts · Full documentation |
+| **Sammy Roy / alias mrblue223** | Infrastructure Lead | SSL/TLS configuration (Nginx + Postfix/Dovecot) · DNSSEC implementation & setup (KMS CMK, KSK, zone signing) · DNS record architecture · Certificate hardening · Security headers · Cipher suite selection · DNS-01 renewal pipeline · Automated verification scripts · Full documentation |
 | **Paulo Borelli** | IAM & Automation Lead | AWS CLI setup documentation · AWS SSO authentication guide · IAM hardening policies · S3 anti-ransomware guardrails · `launch-instance.sh` EC2 launch automation · IMDSv2 enforcement (`HttpTokens=required`) against SSRF |
 | **Keeshon Bain** | Architecture & Consulting | Deployment-flow restructure (CLI → DNS → EC2 → Nginx → Postfix) · Technical consulting across all phases |
 | **Marc-Olivier Hélie** | Documentation | Assignment reflection · Screenshot documentation |
