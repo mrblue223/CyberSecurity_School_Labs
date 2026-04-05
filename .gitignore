@@ -1,0 +1,35 @@
+# SSH keys
+*.pem
+*.key
+id_rsa
+id_ed25519
+authorized_keys
+
+# AWS credentials
+.aws/
+credentials
+aws_credentials
+
+# Mail server secrets
+sasl_passwd
+sasl_passwd.lmdb
+users
+/etc/dovecot/users
+
+# DKIM private keys
+mail.private
+*.private
+
+# Certificates / private keys
+privkey.pem
+*.p12
+*.pfx
+
+# Environment files
+.env
+.env.*
+*.env
+
+# Reports
+gitleaks-report.json
+trufflehog-report*
