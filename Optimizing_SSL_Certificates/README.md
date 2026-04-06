@@ -1,7 +1,7 @@
 # Optimizing SSL/TLS Certificates for Nginx & Postfix
 
 > **Author:** Sammy Roy · **Cohort:** MEQ7 · **Team:** Team 3
-> **Domain:** `gwallofchina.yulcyberhub.click` · **Submitted:** April 2, 2026
+> **Domain:** `gwallofchina.yulcyberhub.click` · **Submitted:** April 4, 2026
 
 ---
 
