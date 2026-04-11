@@ -17,6 +17,7 @@ echo " Running DNS Update Script by mrblue"
 echo " Updating record for gwallofchina.yulcyberhub.click"
 echo "-------------------------------------------------------"
 
+sleep 30
 # Configuration
 ZONE_ID="Z0433076DMIP84BGAZGN"
 RECORD_NAME="gwallofchina.yulcyberhub.click"
