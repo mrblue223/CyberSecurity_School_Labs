@@ -1,0 +1,57 @@
+<!--
+  Great Wall - Correlation Rules
+  YUL CYBERHUB - MEQ7 Team 3
+  Rule IDs: 100700-100799
+-->
+
+<group name="gwall,correlation,">
+
+  <!-- Sustained web brute force -->
+  <rule id="100700" level="14" frequency="10" timeframe="300">
+    <if_matched_sid>100002</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Sustained web brute force from same IP</description>
+    <group>attack,brute_force,</group>
+  </rule>
+
+  <!-- Sustained SMTP brute force -->
+  <rule id="100701" level="14" frequency="10" timeframe="300">
+    <if_matched_sid>100100</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Sustained SMTP brute force from same IP</description>
+    <group>attack,brute_force,</group>
+  </rule>
+
+  <!-- Sustained IMAP brute force -->
+  <rule id="100702" level="14" frequency="10" timeframe="300">
+    <if_matched_sid>100200</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Sustained IMAP brute force from same IP</description>
+    <group>attack,brute_force,</group>
+  </rule>
+
+  <!-- Web scanning -->
+  <rule id="100704" level="13" frequency="30" timeframe="300">
+    <if_matched_sid>100004</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Sustained web scanning from same IP</description>
+    <group>web,recon,attack,</group>
+  </rule>
+
+  <!-- Repeated SSRF attempts -->
+  <rule id="100705" level="15" frequency="3" timeframe="600">
+    <if_matched_sid>100003</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Repeated forbidden access attempts from same IP</description>
+    <group>attack,</group>
+  </rule>
+
+  <!-- Sustained SSH brute force -->
+  <rule id="100706" level="14" frequency="10" timeframe="300">
+    <if_matched_sid>100400</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Sustained SSH brute force on bastion</description>
+    <group>ssh,attack,brute_force,</group>
+  </rule>
+
+</group>
