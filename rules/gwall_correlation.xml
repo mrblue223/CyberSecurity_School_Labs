@@ -1,0 +1,41 @@
+<!--
+  Great Wall — Correlation and Composite Rules
+  YUL CYBERHUB · MEQ7 Team 3
+  Rule IDs: 100700-100799
+  File: /var/ossec/etc/rules/gwall_correlation.xml
+
+  NOTE: This file depends on rules defined in all other gwall_*.xml files.
+  Load order: all other gwall files must be loaded before this one.
+  Naming convention ensures correct order (correlation loads last alphabetically).
+-->
+
+<group name="gwall,correlation,">
+
+  <rule id="100700" level="14" frequency="2" timeframe="300">
+    <if_matched_sid>100020,100101</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Same IP attacking both web and mail - coordinated attack</description>
+    <group>attack,brute_force,</group>
+  </rule>
+
+  <rule id="100703" level="14" frequency="3" timeframe="120">
+    <if_matched_sid>100022,100112,100406</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Simultaneous DoS against web, mail, and SSH - coordinated attack</description>
+    <group>dos,attack,</group>
+  </rule>
+
+  <rule id="100704" level="13" frequency="2" timeframe="300">
+    <if_matched_sid>100015,100021</if_matched_sid>
+    <same_source_ip/>
+    <description>CORRELATION: Web scanner followed by attack attempt from same IP</description>
+    <group>web,recon,attack,</group>
+  </rule>
+
+  <rule id="100705" level="15" frequency="2" timeframe="600">
+    <if_matched_sid>100017,100600</if_matched_sid>
+    <description>CORRELATION: SSRF attempt targeting AWS metadata - possible credential theft</description>
+    <group>aws,ssrf,attack,</group>
+  </rule>
+
+</group>

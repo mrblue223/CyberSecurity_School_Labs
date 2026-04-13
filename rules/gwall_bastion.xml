@@ -1,0 +1,76 @@
+<!--
+  Great Wall — Bastion SSH and WireGuard Rules
+  YUL CYBERHUB · MEQ7 Team 3
+  Rule IDs: 100400-100499
+  File: /var/ossec/etc/rules/gwall_bastion.xml
+-->
+
+<group name="gwall,bastion,">
+
+  <rule id="100400" level="5">
+    <if_sid>5716</if_sid>
+    <description>Bastion: SSH authentication failure</description>
+    <group>ssh,auth_failure,</group>
+  </rule>
+
+  <rule id="100401" level="12" frequency="6" timeframe="120">
+    <if_matched_sid>100400</if_matched_sid>
+    <same_source_ip/>
+    <description>Bastion: SSH brute force attack - 6+ failures in 120 seconds</description>
+    <group>ssh,auth_failure,brute_force,</group>
+  </rule>
+
+  <rule id="100402" level="14">
+    <if_sid>5716</if_sid>
+    <match>invalid user root|Failed password for root|Failed publickey for root</match>
+    <description>Bastion: SSH root login attempt - critical alert</description>
+    <group>ssh,auth_failure,</group>
+  </rule>
+
+  <rule id="100403" level="8">
+    <if_sid>5716</if_sid>
+    <match>invalid user|illegal user|unknown user</match>
+    <description>Bastion: SSH login attempt with non-existent username</description>
+    <group>ssh,auth_failure,</group>
+  </rule>
+
+  <rule id="100404" level="3">
+    <if_sid>5715</if_sid>
+    <description>Bastion: Successful SSH login</description>
+    <group>ssh,authentication_success,</group>
+  </rule>
+
+  <rule id="100406" level="10" frequency="20" timeframe="30">
+    <if_matched_sid>100400</if_matched_sid>
+    <same_source_ip/>
+    <description>Bastion: SSH connection flood - possible automated attack</description>
+    <group>ssh,dos,</group>
+  </rule>
+
+  <rule id="100407" level="6">
+    <if_sid>5716</if_sid>
+    <match>Failed publickey|Too many authentication failures</match>
+    <description>Bastion: SSH public key authentication failure</description>
+    <group>ssh,auth_failure,</group>
+  </rule>
+
+  <rule id="100411" level="10">
+    <if_sid>1002</if_sid>
+    <match>wireguard|WireGuard</match>
+    <description>Bastion: WireGuard interface error detected</description>
+    <group>vpn,wireguard,error,</group>
+  </rule>
+
+  <rule id="100412" level="5">
+    <if_sid>5402</if_sid>
+    <description>Bastion: Sudo command executed</description>
+    <group>ssh,privilege_escalation,</group>
+  </rule>
+
+  <rule id="100413" level="9">
+    <if_sid>5403</if_sid>
+    <description>Bastion: Sudo command failed - unauthorized privilege escalation attempt</description>
+    <group>ssh,privilege_escalation,</group>
+  </rule>
+
+</group>

@@ -1,0 +1,59 @@
+<!--
+  Great Wall — Dovecot IMAP Rules
+  YUL CYBERHUB · MEQ7 Team 3
+  Rule IDs: 100200-100299
+  File: /var/ossec/etc/rules/gwall_dovecot.xml
+-->
+
+<group name="gwall,dovecot,">
+
+  <rule id="100200" level="6">
+    <if_sid>9700</if_sid>
+    <match>auth failed|authentication failure|Login failed|no auth attempts</match>
+    <description>Dovecot: IMAP authentication failure</description>
+    <group>mail,auth_failure,</group>
+  </rule>
+
+  <rule id="100201" level="11" frequency="6" timeframe="120">
+    <if_matched_sid>100200</if_matched_sid>
+    <same_source_ip/>
+    <description>Dovecot: IMAP brute force attack - 6+ failures in 120 seconds</description>
+    <group>mail,auth_failure,brute_force,</group>
+  </rule>
+
+  <rule id="100202" level="6">
+    <if_sid>9700</if_sid>
+    <match>SSL.*error|TLS.*failed|Disconnected.*TLS|ssl_verify_error</match>
+    <description>Dovecot: TLS/SSL connection error</description>
+    <group>mail,tls,</group>
+  </rule>
+
+  <rule id="100203" level="12">
+    <if_sid>9700</if_sid>
+    <match>No space left|Disk quota exceeded|ENOSPC</match>
+    <description>Dovecot: Disk space critical - mail storage may be full</description>
+    <group>mail,error,</group>
+  </rule>
+
+  <rule id="100204" level="10">
+    <if_sid>9700</if_sid>
+    <match>Fatal: master: service|killed with signal|core dumped|Error: Killed</match>
+    <description>Dovecot: Process crash or unexpected termination</description>
+    <group>mail,error,</group>
+  </rule>
+
+  <rule id="100205" level="3">
+    <if_sid>9700</if_sid>
+    <match>Login: user=</match>
+    <description>Dovecot: Successful IMAP login</description>
+    <group>mail,authentication_success,</group>
+  </rule>
+
+  <rule id="100206" level="9" frequency="5" timeframe="120">
+    <if_matched_sid>100205</if_matched_sid>
+    <same_source_ip/>
+    <description>Dovecot: Multiple mailbox logins from same IP - possible credential stuffing</description>
+    <group>mail,auth_failure,</group>
+  </rule>
+
+</group>
