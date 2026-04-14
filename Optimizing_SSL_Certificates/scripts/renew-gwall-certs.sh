@@ -1,12 +1,19 @@
+sudo tee /usr/local/bin/renew-gwall-certs.sh > /dev/null << 'EOF'
 #!/bin/bash
+# =============================================================
 # Great Wall PKI - Certificate Auto-Renewal Script
-# Renews leaf certs 30 days before expiry
-# Author: mrblue
-# Version: 1.0
+# Author:  mrblue
+# Version: 1.1
+# Date:    2026-04-14
+# Description: Checks and renews Wazuh leaf certificates
+#              30 days before expiry. Regenerates CRL monthly.
+#              Restarts services and runs securityadmin on renewal.
+# =============================================================
 
-LOG="/var/log/gwall-cert-renewal.log"
-CA_CRT="/etc/pki/great-wall-ca/intermediate.crt"
-CA_KEY="/etc/pki/great-wall-ca/intermediate.key"
+<REDACTED>
+<REDACTED>
+<REDACTED>
+<REDACTED>
 DAYS_BEFORE_EXPIRY=30
 
 log() {
@@ -28,7 +35,9 @@ renew_indexer() {
     log "INFO: Renewing indexer certificate..."
     step certificate create wazuh-indexer.gwall.local /tmp/idx.crt /tmp/idx.key \
       --profile leaf \
-      --ca "$CA_CRT" --ca-key "$CA_KEY" \
+      --ca "$CA_CRT" \
+      --ca-key "$CA_KEY" \
+      --ca-password-file "$CA_PASS_FILE" \
       --no-password --insecure --not-after 8760h \
       --kty RSA --size 2048
     if [ $? -ne 0 ]; then
@@ -59,7 +68,9 @@ renew_dashboard() {
     log "INFO: Renewing dashboard certificate..."
     step certificate create wazuh.gwall.local /tmp/dash.crt /tmp/dash.key \
       --profile leaf \
-      --ca "$CA_CRT" --ca-key "$CA_KEY" \
+      --ca "$CA_CRT" \
+      --ca-key "$CA_KEY" \
+      --ca-password-file "$CA_PASS_FILE" \
       --no-password --insecure --not-after 8760h \
       --kty RSA --size 2048
     if [ $? -ne 0 ]; then
@@ -87,6 +98,7 @@ renew_crl() {
   log "INFO: Regenerating CRL..."
   openssl ca -gencrl \
     -config /etc/pki/great-wall-ca/openssl.cnf \
+    -passin file:"$CA_PASS_FILE" \
     -out /etc/pki/great-wall-ca/crl/intermediate.crl
   if [ $? -eq 0 ]; then
     log "INFO: CRL regenerated successfully"
@@ -111,7 +123,19 @@ run_securityadmin() {
   fi
 }
 
-log "INFO: ===== Starting Great Wall cert renewal check ====="
+# ─── PREFLIGHT CHECK ────────────────────────────────────────
+if [ ! -f "$CA_PASS_FILE" ]; then
+  log "ERROR: Passphrase file $CA_PASS_FILE not found - aborting"
+  exit 1
+fi
+
+if [ "$(stat -c %a $CA_PASS_FILE)" != "400" ]; then
+  log "ERROR: Passphrase file has insecure permissions - aborting"
+  exit 1
+fi
+
+# ─── MAIN ───────────────────────────────────────────────────
+log "INFO: ===== Starting Great Wall cert renewal check (v1.1) ====="
 
 renew_indexer
 INDEXER_STATUS=$?
@@ -134,4 +158,6 @@ if [ "$DASHBOARD_STATUS" -eq 0 ]; then
   sleep 60
 fi
 
-log "INFO: ===== Cert renewal check complete ====="
+log "INFO: ===== Cert renewal check complete (v1.1) ====="
+EOF
+
