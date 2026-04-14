@@ -1,18 +1,31 @@
+# ============================================================
+# Great Wall Project - .gitignore
+# Author: mrblue
+# Updated: 2026-04-14
+# ============================================================
+
 # SSH keys
 *.pem
 *.key
+*.pub
 id_rsa
+id_rsa.*
 id_ed25519
+id_ed25519.*
 authorized_keys
+known_hosts
 
 # AWS credentials
 .aws/
 credentials
 aws_credentials
+aws_config
+*.csv
 
 # Mail server secrets
 sasl_passwd
 sasl_passwd.lmdb
+sasl_passwd.db
 users
 /etc/dovecot/users
 
@@ -20,16 +33,55 @@ users
 mail.private
 *.private
 
-# Certificates / private keys
+# Certificates / PKI
 privkey.pem
+fullchain.pem
+cert.pem
+chain.pem
+*.crt
+*.crl
 *.p12
 *.pfx
+*.der
+*.cer
+openssl.cnf
+
+# CA infrastructure scripts (sensitive paths)
+*-certs.sh
+*renewal*.sh
+*-pass
+renew-gwall-certs.sh
+check-gwall-frontend-certs.sh
 
 # Environment files
 .env
 .env.*
 *.env
+.envrc
 
-# Reports
+# Secrets scanning reports
 gitleaks-report.json
 trufflehog-report*
+secrets-report*
+
+# Pacu / AWS pentest
+pacu.db
+*.session
+downloads/
+
+# Logs (may contain sensitive data)
+*.log
+/var/log/
+
+# OS noise
+.DS_Store
+Thumbs.db
+desktop.ini
+*~
+*.swp
+*.swo
+
+# Editor configs
+.vscode/
+.idea/
+*.iml
