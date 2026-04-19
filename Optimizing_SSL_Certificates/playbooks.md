@@ -519,7 +519,7 @@ FRONTEND_IP=$(aws ec2 describe-instances \
   --output text)
 
 curl -k -I https://$FRONTEND_IP \
-  -H "X-Origin-Verify: c02a26658d778aa9833536b1872ec58449289075e73f903c6fc8581c8bb5a884" \
+  -H "X-Origin-Verify: <REDACTED>" \
   -H "Host: gwallofchina.yulcyberhub.click"
 # Expected: HTTP/2 200
 ```
